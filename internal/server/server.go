@@ -2,27 +2,25 @@ package server
 
 import (
 	"context"
-	"giot/internal/log"
-
 	"fmt"
+	"giot/internal/conf"
+	"giot/internal/log"
+	"os"
+
 	"go.uber.org/zap"
 	"net/http"
 	"time"
-)
-
-const (
-	systemAddress = 8080
 )
 
 type server struct {
 	http *http.Server
 }
 
-type name interface {
+func NewServer() *server {
+	return &server{}
 }
 
 func (s *server) init() error {
-
 	log.Info("Initialize server...")
 	s.setupServer()
 	return nil
@@ -34,8 +32,9 @@ func (s *server) Start(er chan error) {
 		er <- err
 		return
 	}
+	s.printInfo()
 	//start gin server
-	log.Info("start server Listening port: %s", zap.String("", s.http.Addr))
+	log.Infof("start server Listening on: %s", s.http.Addr)
 	go func() {
 		err := s.http.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
@@ -43,21 +42,6 @@ func (s *server) Start(er chan error) {
 			er <- err
 		}
 	}()
-}
-func NewServer() *server {
-	return &server{}
-}
-
-func (s *server) setupServer() {
-	address := fmt.Sprintf(":%d", systemAddress)
-	r := routers()
-	s.http = &http.Server{
-		Addr:           address,
-		Handler:        r,
-		ReadTimeout:    time.Duration(1000) * time.Millisecond,
-		WriteTimeout:   time.Duration(5000) * time.Millisecond,
-		MaxHeaderBytes: 1 << 20,
-	}
 }
 
 func (s *server) Stop() {
@@ -74,4 +58,15 @@ func (s *server) shutdownServer(server *http.Server) {
 			log.Error("Shutting down server error: %s", zap.Error(err))
 		}
 	}
+}
+func (s *server) printInfo() {
+	fmt.Fprint(os.Stdout, "The giot is running successfully!\n\n")
+	//utils.PrintVersion()
+	fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "Listen", conf.ServerHost, conf.ServerPort)
+	if conf.SSLCert != "" && conf.SSLKey != "" {
+		fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "HTTPS Listen", conf.SSLHost, conf.SSLPort)
+	}
+	fmt.Fprintf(os.Stdout, "%-8s: %s\n", "Loglevel", conf.ErrorLogLevel)
+	fmt.Fprintf(os.Stdout, "%-8s: %s\n", "ErrorLogFile", conf.ErrorLogPath)
+	fmt.Fprintf(os.Stdout, "%-8s: %s\n\n", "AccessLogFile", conf.AccessLogPath)
 }

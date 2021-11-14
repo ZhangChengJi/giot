@@ -17,7 +17,7 @@
 
 .idea/
 
-log
+logs
 .DS_Store
 go.sum
 
