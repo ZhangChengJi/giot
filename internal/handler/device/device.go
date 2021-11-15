@@ -3,6 +3,7 @@ package device
 import (
 	"giot/internal/core/model"
 	"giot/internal/handler"
+	"giot/internal/stroage"
 	"github.com/gin-gonic/gin"
 	"github.com/shiningrush/droplet"
 	"github.com/shiningrush/droplet/wrapper"
@@ -23,5 +24,7 @@ func (h *Handler) ApplyRoute(r *gin.Engine) {
 }
 func (h *Handler) Create(c droplet.Context) (interface{}, error) {
 	input := c.Input().(*model.Device)
-	return input, nil
+	var result, _ = stroage.DB.SqlMapClient("query_history", "guest").Query().List()
+
+	return result, nil
 }

@@ -50,6 +50,7 @@ var (
 	SSLCert          string
 	SSLKey           string
 	ETCDConfig       *Etcd
+	PostgresConfig   *Postgres
 	ErrorLogLevel    = "warn"
 	ErrorLogPath     = "logs/error.log"
 	AccessLogPath    = "logs/access.log"
@@ -73,6 +74,17 @@ type Etcd struct {
 	Password  string
 	MTLS      *MTLS
 	Prefix    string
+}
+
+type Postgres struct {
+	Host         string
+	Username     string
+	Password     string
+	Database     string
+	Port         int
+	MaxIdleConns int  `mapstructure:"max_idle_conns"`
+	MaxOpenConns int  `mapstructure:"max_open_conns"`
+	ShowSql      bool `mapstructure:"show_sql"`
 }
 
 type SSL struct {
@@ -103,6 +115,7 @@ type Log struct {
 
 type Conf struct {
 	Etcd      Etcd
+	Postgres  Postgres
 	Listen    Listen
 	SSL       SSL
 	Log       Log
@@ -194,6 +207,9 @@ func setupConfig() {
 	// ETCD Storage
 	if len(config.Conf.Etcd.Endpoints) > 0 {
 		initEtcdConfig(config.Conf.Etcd)
+	}
+	if len(config.Conf.Postgres.Host) > 0 {
+		initPostgresConfig(config.Conf.Postgres)
 	}
 
 	// error log
@@ -299,6 +315,18 @@ func initEtcdConfig(conf Etcd) {
 		Password:  conf.Password,
 		MTLS:      conf.MTLS,
 		Prefix:    prefix,
+	}
+}
+func initPostgresConfig(conf Postgres) {
+	PostgresConfig = &Postgres{
+		Host:         conf.Host,
+		Username:     conf.Username,
+		Password:     conf.Password,
+		Database:     conf.Database,
+		Port:         conf.Port,
+		MaxIdleConns: conf.MaxIdleConns,
+		MaxOpenConns: conf.MaxOpenConns,
+		ShowSql:      conf.ShowSql,
 	}
 }
 
