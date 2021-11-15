@@ -23,5 +23,6 @@ func (h *Handler) ApplyRoute(r *gin.Engine) {
 }
 func (h *Handler) Create(c droplet.Context) (interface{}, error) {
 	input := c.Input().(*model.Device)
+
 	return input, nil
 }
