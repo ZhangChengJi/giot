@@ -23,6 +23,7 @@ func (h *Handler) ApplyRoute(r *gin.Engine) {
 }
 func (h *Handler) Create(c droplet.Context) (interface{}, error) {
 	input := c.Input().(*model.Device)
+	var result, _ = stroage.DB.SqlMapClient("query_history", "guest").Query().List()
 
-	return input, nil
+	return result, nil
 }

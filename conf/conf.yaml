@@ -21,7 +21,7 @@ conf:
     # host: 127.0.0.1     # the address on which the `Manager API` should listen.
                           # The default value is 0.0.0.0, if want to specify, please enable it.
                           # This value accepts IPv4, IPv6, and hostname.
-    port: 1000            # The port on which the `Manager API` should listen.
+    port: 2000            # The port on which the `Manager API` should listen.
 
   # ssl:
   #   host: 127.0.0.1     # the address on which the `Manager API` should listen for HTTPS.
@@ -37,6 +37,15 @@ conf:
   etcd:
     endpoints:            # supports defining multiple etcd host addresses for an etcd cluster
       - 127.0.0.1:2379
+  postgres:
+    host: 192.168.0.42
+    port: 5432
+    username: postgres
+    password: postgres
+    database: zabbix
+    max_idle_conns: 1500 # 最大空闲的连接数
+    Max_open_conns: 900
+    show_sql: true
                           # yamllint disable rule:comments-indentation
                           # etcd basic auth info
     # username: "root"    # ignore etcd username if not enable etcd auth
@@ -48,7 +57,7 @@ conf:
     # prefix: /apisix       # apisix config's prefix in etcd, /apisix by default
   log:
     error_log:
-      level: info       # supports levels, lower to higher: debug, info, warn, error, panic, fatal
+      level: debug       # supports levels, lower to higher: debug, info, warn, error, panic, fatal
       file_path:
         logs/error.log  # supports relative path, absolute path, standard output
                         # such as: logs/error.log, /tmp/logs/error.log, /dev/stdout, /dev/stderr
