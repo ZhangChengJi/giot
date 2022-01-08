@@ -16,6 +16,7 @@ import (
 type server struct {
 	http *http.Server
 	db   *xorm.Engine
+	tcp  *TcpServer
 }
 
 func NewServer() *server {
@@ -24,12 +25,13 @@ func NewServer() *server {
 
 func (s *server) init() error {
 	log.Info("Initialize postgres...")
-	err := s.setupDb()
-	if err != nil {
-		return err
-	}
+	//err := s.setupDb()
+	//if err != nil {
+	//	return err
+	//}
 	log.Info("Initialize server...")
 	s.setupServer()
+	setupTcp()
 	return nil
 }
 

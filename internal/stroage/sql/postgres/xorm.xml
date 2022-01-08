@@ -1,5 +1,0 @@
-<sqlMap>
-    <sql id="query_history">
-        select * from users where alias=?
-    </sql>
-</sqlMap>

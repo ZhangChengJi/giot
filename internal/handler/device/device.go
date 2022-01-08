@@ -22,8 +22,8 @@ func (h *Handler) ApplyRoute(r *gin.Engine) {
 		wrapper.InputType(reflect.TypeOf(model.Device{}))))
 }
 func (h *Handler) Create(c droplet.Context) (interface{}, error) {
-	input := c.Input().(*model.Device)
-	var result, _ = stroage.DB.SqlMapClient("query_history", "guest").Query().List()
+	///	input := c.Input().(*model.Device)
+	//var result, _ = stroage.DB.SqlMapClient("query_history", "guest").Query().List()
 
-	return result, nil
+	return nil, nil
 }

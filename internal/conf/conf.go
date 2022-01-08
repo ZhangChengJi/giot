@@ -60,6 +60,7 @@ var (
 	ImportSizeLimit  = 10 * 1024 * 1024
 	AllowList        []string
 	Plugins          = map[string]bool{}
+	GnetConfig       *Gnet
 )
 
 type MTLS struct {
@@ -116,6 +117,7 @@ type Log struct {
 type Conf struct {
 	Etcd      Etcd
 	Postgres  Postgres
+	Gnet      Gnet
 	Listen    Listen
 	SSL       SSL
 	Log       Log
@@ -138,6 +140,11 @@ type Config struct {
 	Conf           Conf
 	Authentication Authentication
 	Plugins        []string
+}
+type Gnet struct {
+	Addr      string
+	Multicore bool
+	Reuseport bool
 }
 
 // TODO: we should no longer use init() function after remove all handler's integration tests
@@ -210,6 +217,10 @@ func setupConfig() {
 	}
 	if len(config.Conf.Postgres.Host) > 0 {
 		initPostgresConfig(config.Conf.Postgres)
+	}
+	if len(config.Conf.Gnet.Addr) > 0 {
+		initGnetConfig(config.Conf.Gnet)
+
 	}
 
 	// error log
@@ -341,4 +352,12 @@ func initParallelism(choiceCores int) {
 		choiceCores = maxSupportedCores
 	}
 	runtime.GOMAXPROCS(choiceCores)
+}
+
+func initGnetConfig(conf Gnet) {
+	GnetConfig = &Gnet{
+		Addr:      conf.Addr,
+		Multicore: conf.Multicore,
+		Reuseport: conf.Reuseport,
+	}
 }
