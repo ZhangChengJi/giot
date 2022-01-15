@@ -10,7 +10,7 @@ require (
 	github.com/Chronokeeper/anyxml v0.0.0-20160530174208-54457d8e98c6 // indirect
 	github.com/CloudyKit/fastprinter v0.0.0-20200109182630-33d98a066a53 // indirect
 	github.com/CloudyKit/jet v2.1.2+incompatible // indirect
-	github.com/RussellLuo/timingwheel v0.0.0-20201029015908-64de9d088c74 // indirect
+	github.com/RussellLuo/timingwheel v0.0.0-20201029015908-64de9d088c74
 	github.com/agrison/go-tablib v0.0.0-20160310143025-4930582c22ee // indirect
 	github.com/agrison/mxj v0.0.0-20160310142625-1269f8afb3b4 // indirect
 	github.com/bndr/gotabulate v1.1.2 // indirect
@@ -24,14 +24,16 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/gin-contrib/gzip v0.0.5
 	github.com/gin-gonic/gin v1.7.7
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/lithammer/dedent v1.1.0
+	github.com/lithammer/fuzzysearch v1.1.3 // indirect
 	github.com/mattn/go-sqlite3 v1.14.10 // indirect
+	github.com/orcaman/concurrent-map v1.0.0 // indirect
 	github.com/panjf2000/gnet v1.6.4
 	github.com/satori/go.uuid v1.2.0
 	github.com/shiningrush/droplet v0.3.0
@@ -51,5 +53,7 @@ require (
 	go.etcd.io/etcd v3.3.25+incompatible
 	go.uber.org/zap v1.20.0
 	gopkg.in/flosch/pongo2.v3 v3.0.0-20141028000813-5e81b817a0c4 // indirect
+	gorm.io/driver/mysql v1.2.3
+	gorm.io/gorm v1.22.4
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )

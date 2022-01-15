@@ -11,7 +11,7 @@ import (
 	"syscall"
 )
 
-func NewGiotCommand() *cobra.Command {
+func NewStoreCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "giot 设备接入平台",
 		Short: "giot",
@@ -31,7 +31,7 @@ func NewGiotCommand() *cobra.Command {
 			log.InitLogger()
 			s := server.NewServer()
 			errSig := make(chan error, 5)
-			s.Start(errSig)
+			s.Start(server.STORE, errSig)
 			// Signal received to the process externally.
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

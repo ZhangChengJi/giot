@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 	"giot/internal/conf"
+	"giot/internal/core/model"
+	"giot/internal/device"
 	"giot/internal/manager/modbus"
-	"giot/internal/processor"
-
 	"github.com/panjf2000/gnet"
 	"log"
 	"sync"
@@ -16,8 +16,11 @@ type TcpServer struct {
 	*gnet.EventServer
 	connectedSockets sync.Map
 	codec            gnet.ICodec
-	data             processor.RemoteData
-	re               processor.RegisterData
+	//data             processor.RemoteData
+	//re               processor.RegisterData
+	RegisterChan  chan *model.RegisterData
+	DataChan      chan *model.RemoteData
+	ListenMsgChan chan *model.ListenMsg
 }
 
 func (ps *TcpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
@@ -36,6 +39,12 @@ func (ps *TcpServer) OnClosed(c gnet.Conn, err error) (action gnet.Action) {
 
 	log.Printf("Socket with addr: %s is closing...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Delete(c.RemoteAddr().String())
+	ha := &model.ListenMsg{
+		ListenType: 1,
+		RemoteAddr: c.RemoteAddr().String(),
+		Command:    1,
+	}
+	ps.ListenMsgChan <- ha
 	return
 }
 
@@ -56,15 +65,16 @@ func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.A
 	fmt.Printf("data:%X\n", frame)
 
 	length := len(frame)
-	if length > 0 && length > 7 {
+	if length > 0 && length >= 7 {
 		if length == 24 { //注册
-			ps.re.C = c
-			ps.re.D = frame
-			processor.RegisterChan <- ps.re
+			re := &model.RegisterData{C: c, D: frame}
+			ps.RegisterChan <- re
 		} else { //上数
-			ps.data.RemoteIp = []byte(c.RemoteAddr().String())
-			ps.data.Frame = frame
-			processor.DataChan <- ps.data
+			da := &model.RemoteData{
+				Frame:      frame,
+				RemoteAddr: c.RemoteAddr().String(),
+			}
+			ps.DataChan <- da
 		}
 	}
 
@@ -79,11 +89,12 @@ func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.A
 
 func (ps *TcpServer) aaa() {
 	fmt.Println("当前时间：", time.Now())
-	myTicker := time.NewTicker(time.Second * 3) //
+	myTicker := time.NewTicker(time.Second * 30) //
 	go func() {
 		for {
 			<-myTicker.C
-			r, _ := modbus.NewClient(&modbus.RtuHandler{}).ReadHoldingRegisters(0, 1)
+			r, _ := modbus.NewClient(&modbus.RtuHandler{}).ReadHoldingRegisters(1, 0, 1)
+			fmt.Printf("%X", r)
 			ps.connectedSockets.Range(func(key, value interface{}) bool {
 				c := value.(gnet.Conn)
 				c.AsyncWrite(r)
@@ -93,11 +104,20 @@ func (ps *TcpServer) aaa() {
 	}()
 }
 
-func setupTcp() {
-	processor.Setup()
+func (s *server) setupTcp() {
 	config := conf.GnetConfig
 	log.Println("gent tcp event loop started")
-	t := &TcpServer{}
-	t.aaa()
-	log.Fatalf("gent tcp event loop start failed: %v", gnet.Serve(t, fmt.Sprintf("tcp://%v", config.Addr), gnet.WithMulticore(config.Multicore), gnet.WithReusePort(config.Reuseport)))
+	t := &TcpServer{
+		DataChan:      make(chan *model.RemoteData, 1024),
+		RegisterChan:  make(chan *model.RegisterData, 1024),
+		ListenMsgChan: make(chan *model.ListenMsg),
+	}
+	pro := NewProcessor()
+	pro.Tw.Start()
+	defer pro.Tw.Stop()
+	go pro.Swift(t.DataChan, t.RegisterChan)
+	go pro.ListenCommand(t.ListenMsgChan)
+	device.Init()
+	//	t.aaa()
+	log.Fatalf("gent tcp event loop start failed: %v", gnet.Serve(t, fmt.Sprintf("tcp://%v", config.Addr), gnet.WithMulticore(config.Multicore), gnet.WithTCPKeepAlive(5*time.Second), gnet.WithReusePort(config.Reuseport)))
 }

@@ -10,7 +10,7 @@ import (
 type HubKey string
 
 const (
-	HubKeyDevicePrefix HubKey = "device"
+	HubKeyDevicePrefix HubKey = "logic"
 )
 
 type DeviceStore struct {
@@ -31,13 +31,13 @@ func GetDevice(key HubKey) *DeviceStore {
 	if s, ok := deviceHub[key]; ok {
 		return s
 	}
-	panic(fmt.Sprintf("no device with key: %s", key))
+	panic(fmt.Sprintf("no logic with key: %s", key))
 }
 
 func WithPrefix(str string) HubKey {
 	return HubKeyDevicePrefix + "/" + HubKey(str)
 }
 func NewDevice(key HubKey, device model.Device) error {
-	deviceHub[key] = device
+	//deviceHub[key] = logic
 	return nil
 }

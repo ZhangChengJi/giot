@@ -79,7 +79,6 @@ func InitETCDClient(etcdConf *conf.Etcd) error {
 		log.Errorf("init etcd failed: %s", err)
 		return fmt.Errorf("init etcd failed: %s", err)
 	}
-
 	Client = cli
 	utils.AppendToClosers(Close)
 	return nil

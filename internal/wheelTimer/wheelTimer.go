@@ -1,4 +1,4 @@
-package processor
+package wheelTimer
 
 import (
 	"fmt"
@@ -15,20 +15,30 @@ var (
 	workerPool *goroutine.Pool
 )
 
-type syncTimer struct {
-	c          gnet.Conn
-	guid       string
-	directives [][]byte
+type SyncTimer struct {
+	Conn       gnet.Conn
+	RemoteAddr string
+	Guid       string
+	Time       time.Duration
+	Directives [][]byte //下发指令
+	T          *timingwheel.Timer
 }
 
 type Interface interface {
-	execute()
+	Execute()
 }
 
-func (t *syncTimer) execute() {
-	for _, v := range t.directives {
-		t.c.AsyncWrite(v)
+func (t *SyncTimer) Execute() {
+	for _, v := range t.Directives {
+		fmt.Println("任务下发")
+		t.Conn.AsyncWrite(v)
 	}
+}
+
+// DeviceScheduler **********************定时器***************************//
+
+func NewTimer() *timingwheel.TimingWheel {
+	return scheduleTimer()
 }
 
 type DeviceScheduler struct {
@@ -39,15 +49,13 @@ func (s *DeviceScheduler) Next(prev time.Time) time.Time {
 	return prev.Add(s.Interval)
 }
 
-func scheduleTimer() {
-	tw := timingwheel.NewTimingWheel(time.Millisecond, 20)
-	tw.Start()
-	defer tw.Stop()
-	tw.ScheduleFunc(&DeviceScheduler{time.Second}, func() {
-
-	})
-
+func scheduleTimer() *timingwheel.TimingWheel {
+	tw := timingwheel.NewTimingWheel(time.Second, 20)
+	return tw
 }
+
+//*********************END****************************//
+
 func Second60Timer() {
 	workerPool.Submit(func() {
 		t := time.NewTicker(time.Second * 60)

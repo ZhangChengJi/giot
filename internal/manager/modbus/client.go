@@ -13,14 +13,35 @@ type client struct {
 func NewClient(handler *RtuHandler) Client {
 	return &client{rtuHandler: handler}
 }
-func (c *client) ReadHoldingRegisters(address, quantity uint16) (results []byte, err error) {
-	c.rtuHandler.SlaveId = 1
+func (c *client) ReadHoldingRegisters(slaveId byte, address, quantity uint16) (results []byte, err error) {
+	c.rtuHandler.SlaveId = slaveId
 	if quantity < 1 || quantity > 125 {
 		err = fmt.Errorf("modbus: quantity '%v' must be between '%v' and '%v',", quantity, 1, 125)
 		return
 	}
 	request := ProtocolDataUnit{
 		FunctionCode: FuncCodeReadHoldingRegisters,
+		Data:         dataBlock(address, quantity),
+	}
+	return c.rtuHandler.Encode(&request)
+}
+
+// Request:
+//  Function code         : 1 byte (0x04)
+//  Starting address      : 2 bytes
+//  Quantity of registers : 2 bytes
+// Response:
+//  Function code         : 1 byte (0x04)
+//  Byte count            : 1 byte
+//  Input registers       : N bytes
+func (c *client) ReadInputRegisters(slaveId byte, address, quantity uint16) (results []byte, err error) {
+	c.rtuHandler.SlaveId = slaveId
+	if quantity < 1 || quantity > 125 {
+		err = fmt.Errorf("modbus: quantity '%v' must be between '%v' and '%v',", quantity, 1, 125)
+		return
+	}
+	request := ProtocolDataUnit{
+		FunctionCode: FuncCodeReadInputRegisters,
 		Data:         dataBlock(address, quantity),
 	}
 	return c.rtuHandler.Encode(&request)

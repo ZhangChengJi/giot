@@ -50,7 +50,7 @@ var (
 	SSLCert          string
 	SSLKey           string
 	ETCDConfig       *Etcd
-	PostgresConfig   *Postgres
+	MysqlConfig      *Mysql
 	ErrorLogLevel    = "warn"
 	ErrorLogPath     = "logs/error.log"
 	AccessLogPath    = "logs/access.log"
@@ -77,7 +77,7 @@ type Etcd struct {
 	Prefix    string
 }
 
-type Postgres struct {
+type Mysql struct {
 	Host         string
 	Username     string
 	Password     string
@@ -116,7 +116,7 @@ type Log struct {
 
 type Conf struct {
 	Etcd      Etcd
-	Postgres  Postgres
+	Mysql     Mysql
 	Gnet      Gnet
 	Listen    Listen
 	SSL       SSL
@@ -215,8 +215,8 @@ func setupConfig() {
 	if len(config.Conf.Etcd.Endpoints) > 0 {
 		initEtcdConfig(config.Conf.Etcd)
 	}
-	if len(config.Conf.Postgres.Host) > 0 {
-		initPostgresConfig(config.Conf.Postgres)
+	if len(config.Conf.Mysql.Host) > 0 {
+		initMysqlConfig(config.Conf.Mysql)
 	}
 	if len(config.Conf.Gnet.Addr) > 0 {
 		initGnetConfig(config.Conf.Gnet)
@@ -328,8 +328,8 @@ func initEtcdConfig(conf Etcd) {
 		Prefix:    prefix,
 	}
 }
-func initPostgresConfig(conf Postgres) {
-	PostgresConfig = &Postgres{
+func initMysqlConfig(conf Mysql) {
+	MysqlConfig = &Mysql{
 		Host:         conf.Host,
 		Username:     conf.Username,
 		Password:     conf.Password,

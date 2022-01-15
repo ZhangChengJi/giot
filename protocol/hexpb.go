@@ -62,7 +62,7 @@ func (hex *HexLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 			return response.Data, nil
 		}
 	} else {
-		return nil, errors.New("device payload failed")
+		return nil, errors.New("logic payload failed")
 	}
 
 }

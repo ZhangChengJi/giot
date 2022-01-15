@@ -10,7 +10,7 @@ import (
 
 func RequestLogHandler(logger *zap.SugaredLogger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		start, host, remoteIP, path, method := time.Now(), c.Request.Host, c.ClientIP(), c.Request.URL.Path, c.Request.Method
+		start, host, RemoteAddr, path, method := time.Now(), c.Request.Host, c.ClientIP(), c.Request.URL.Path, c.Request.Method
 		query := c.Request.URL.RawQuery
 		requestId := c.Writer.Header().Get("X-Request-Id")
 
@@ -33,7 +33,7 @@ func RequestLogHandler(logger *zap.SugaredLogger) gin.HandlerFunc {
 			zap.String("query", query),
 			zap.String("requestId", requestId),
 			zap.Duration("latency", latency),
-			zap.String("remoteIP", remoteIP),
+			zap.String("RemoteAddr", RemoteAddr),
 			zap.String("method", method),
 			//zap.String("respBody", respBody),
 			zap.Strings("errs", errs),
