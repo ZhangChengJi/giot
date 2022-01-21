@@ -3,8 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
-	"giot/internal/scheduler/storage"
 	"giot/internal/virtual/wheelTimer"
+	"giot/pkg/etcd"
 	"giot/pkg/log"
 	cmap "github.com/orcaman/concurrent-map"
 	"github.com/panjf2000/gnet"
@@ -21,13 +21,13 @@ type DeviceTimerIn interface {
 }
 
 type TimerStore struct {
-	Stg   storage.Interface
+	Stg   etcd.Interface
 	cache cmap.ConcurrentMap
 	//guid  cmap.ConcurrentMap
 }
 
 func NewTimerStore() *TimerStore {
-	return &TimerStore{Stg: storage.GenEtcdStorage(), cache: cmap.New()}
+	return &TimerStore{Stg: etcd.GenEtcdStorage(), cache: cmap.New()}
 }
 
 func (t *TimerStore) Create(ctx context.Context, key string, obj []*wheelTimer.SyncTimer) {
