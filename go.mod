@@ -21,28 +21,26 @@ require (
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/gin-contrib/gzip v0.0.5
 	github.com/gin-gonic/gin v1.7.7
-	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
-	github.com/lib/pq v1.10.4
+	github.com/kr/text v0.2.0 // indirect
 	github.com/lithammer/dedent v1.1.0
-	github.com/lithammer/fuzzysearch v1.1.3 // indirect
 	github.com/mattn/go-sqlite3 v1.14.10 // indirect
-	github.com/orcaman/concurrent-map v1.0.0 // indirect
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/orcaman/concurrent-map v1.0.0
 	github.com/panjf2000/gnet v1.6.4
 	github.com/satori/go.uuid v1.2.0
 	github.com/shiningrush/droplet v0.3.0
-	github.com/shiningrush/droplet/wrapper/gin v0.3.0
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
-	github.com/swaggo/gin-swagger v1.3.3
 	github.com/syndtr/goleveldb v1.0.0 // indirect
+	github.com/taosdata/driver-go v0.0.0-20210609071024-b8f76da4a708
 	github.com/tealeg/xlsx v1.0.5 // indirect
 	github.com/tidwall/gjson v1.12.1
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
@@ -52,6 +50,7 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.etcd.io/etcd v3.3.25+incompatible
 	go.uber.org/zap v1.20.0
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/flosch/pongo2.v3 v3.0.0-20141028000813-5e81b817a0c4 // indirect
 	gorm.io/driver/mysql v1.2.3
 	gorm.io/gorm v1.22.4

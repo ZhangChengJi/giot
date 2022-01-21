@@ -2,7 +2,7 @@ package gorm
 
 import (
 	"fmt"
-	"giot/internal/conf"
+	"giot/conf"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -12,7 +12,6 @@ func New(conf *conf.Mysql) (*gorm.DB, error) {
 	db, err := gorm.Open(mysql.Open(dataSource), &gorm.Config{})
 	if err != nil {
 		return nil, err
-
 	}
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxIdleConns(conf.MaxIdleConns)

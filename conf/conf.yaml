@@ -50,6 +50,19 @@ conf:
     addr: 0.0.0.0:9000
     multicore: true
     reuseport: true
+  mqtt:
+    host: 0.0.0.0
+    port: 1883
+    username: admin
+    password: public
+    client_id: gnet_tcp
+  tdengine:
+    host: 0.0.0.0
+    port: 6030
+    username: root
+    password: taosdata
+    Keep: 90
+    Days: 20
                           # yamllint disable rule:comments-indentation
                           # etcd basic auth info
     # username: "root"    # ignore etcd username if not enable etcd auth
