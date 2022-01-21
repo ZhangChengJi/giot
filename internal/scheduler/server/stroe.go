@@ -1,13 +1,13 @@
 package server
 
 import (
-	"giot/internal/scheduler/conf"
-	"giot/internal/scheduler/log"
-	"giot/internal/scheduler/storage"
+	"giot/conf"
+	"giot/pkg/etcd"
+	"giot/pkg/log"
 )
 
-func (s *server) setupStore() error {
-	if err := storage.InitETCDClient(conf.ETCDConfig); err != nil {
+func (s *server) setupEtcd() error {
+	if err := etcd.InitETCDClient(conf.ETCDConfig); err != nil {
 		log.Errorf("init etcd client fail: %w", err)
 		return err
 	}

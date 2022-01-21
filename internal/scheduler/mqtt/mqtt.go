@@ -2,7 +2,7 @@ package mqtt
 
 import (
 	"fmt"
-	"giot/internal/scheduler/log"
+	"giot/pkg/log"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 

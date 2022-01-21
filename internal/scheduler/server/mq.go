@@ -1,9 +1,8 @@
 package server
 
 import (
-	"giot/internal/scheduler/log"
-	broker "giot/internal/scheduler/mqtt"
-	"giot/pkg/mqtt"
+	"giot/pkg/log"
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 func (s *server) setupMqtt() error {

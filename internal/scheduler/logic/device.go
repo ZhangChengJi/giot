@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"giot/internal/scheduler/db"
-	"giot/internal/scheduler/modbus"
-	model "giot/internal/scheduler/model"
-	"giot/internal/scheduler/storage"
+	"giot/internal/scheduler/model"
+	"giot/pkg/etcd"
+	"giot/utils/modbus"
 	"reflect"
 	"time"
 )
@@ -27,7 +27,7 @@ var (
 
 type DeviceSvc struct {
 	Modbus modbus.Client
-	Etcd   storage.Interface
+	Etcd   etcd.Interface
 }
 
 func (device *DeviceSvc) InitEtcdDataLoad() error {

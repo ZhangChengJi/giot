@@ -1,10 +1,10 @@
 package server
 
 import (
-	"giot/internal/scheduler/conf"
+	"giot/conf"
 	"giot/internal/scheduler/db"
-	"giot/internal/scheduler/log"
 	"giot/pkg/gorm"
+	"giot/pkg/log"
 	"giot/pkg/tdengine"
 )
 

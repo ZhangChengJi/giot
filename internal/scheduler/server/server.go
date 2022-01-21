@@ -3,12 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	"giot/internal/scheduler/conf"
-	"giot/internal/scheduler/log"
+	"giot/conf"
 	"giot/internal/scheduler/logic"
-	"giot/internal/scheduler/modbus"
-	"giot/internal/scheduler/storage"
 	"giot/internal/scheduler/transfer"
+	"giot/pkg/etcd"
+	"giot/pkg/log"
+	"giot/utils/modbus"
 	"github.com/xormplus/xorm"
 	"os"
 
@@ -46,7 +46,7 @@ func (s *server) init() error {
 	}
 
 	log.Info("Initialize etcd...")
-	err = s.setupStore()
+	err = s.setupEtcd()
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -66,7 +66,7 @@ func (s *server) Start(er chan error) {
 		er <- err
 		return
 	}
-	a := &logic.DeviceSvc{Modbus: modbus.NewClient(&modbus.RtuHandler{}), Etcd: storage.GenEtcdStorage()}
+	a := &logic.DeviceSvc{Modbus: modbus.NewClient(&modbus.RtuHandler{}), Etcd: etcd.GenEtcdStorage()}
 	a.InitEtcdDataLoad()
 	go transfer.SetupTransfer()
 	s.printInfo()
