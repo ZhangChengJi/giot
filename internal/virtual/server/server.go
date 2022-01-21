@@ -72,9 +72,11 @@ func (s *server) shutdownServer(server *http.Server) {
 	}
 }
 func (s *server) printInfo() {
-	fmt.Fprint(os.Stdout, "The giot is running successfully!\n\n")
+	time.Sleep(200 * time.Millisecond)
+	fmt.Fprint(os.Stdout, "The virtual is running successfully!\n")
+	fmt.Fprint(os.Stdout, "🔫 哒哒哒哒哒......\n")
 	//utils.PrintVersion()
-	fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "Listen", conf.ServerHost, conf.ServerPort)
+	//fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "Listen", conf.ServerHost, conf.ServerPort)
 	if conf.SSLCert != "" && conf.SSLKey != "" {
 		fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "HTTPS Listen", conf.SSLHost, conf.SSLPort)
 	}
