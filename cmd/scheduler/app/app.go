@@ -1,9 +1,9 @@
 package app
 
 import (
-	"giot/internal/scheduler/conf"
-	"giot/internal/scheduler/log"
+	"giot/conf"
 	"giot/internal/scheduler/server"
+	"giot/pkg/log"
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	"os"

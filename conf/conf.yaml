@@ -37,6 +37,7 @@ conf:
   etcd:
     endpoints:            # supports defining multiple etcd host addresses for an etcd cluster
       - 127.0.0.1:2379
+    prefix: giot
   mysql:
     host: 192.168.0.42
     port: 3306

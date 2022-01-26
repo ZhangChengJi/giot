@@ -26,6 +26,7 @@ const (
 	FuncCodeReadWriteMultipleRegisters = 23
 	FuncCodeMaskWriteRegister          = 22
 	FuncCodeReadFIFOQueue              = 24
+	FuncAnswerSuccessRegisters         = 113
 )
 
 const (
@@ -43,6 +44,11 @@ const (
 	rtuMinSize       = 4
 	rtuMaxSize       = 256
 	rtuExceptionSize = 5
+)
+
+var (
+	Success = []byte{0x0, 0x1}
+	Error   = []byte{0x0, 0x0}
 )
 
 // ModbusError implements error interface.

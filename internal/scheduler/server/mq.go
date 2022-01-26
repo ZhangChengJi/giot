@@ -1,13 +1,14 @@
 package server
 
 import (
+	"giot/conf"
+	broker "giot/internal/scheduler/mqtt"
 	"giot/pkg/log"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"giot/pkg/mqtt"
 )
 
 func (s *server) setupMqtt() error {
-
-	if client, err := mqtt.NewClient(); err != nil {
+	if client, err := mqtt.New(conf.MqttConfig); err != nil {
 		log.Errorf("init mqtt client fail: %w", err)
 		return err
 	} else {

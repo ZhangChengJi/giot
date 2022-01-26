@@ -11,7 +11,7 @@ import (
 type SlaveStoreIn interface {
 	Create(ctx context.Context, key string, obj []*model.Slave)
 	Get(ctx context.Context, key string) ([]*model.Slave, error)
-	GetAttributeId(ctx context.Context, key string, slaveId byte) (string, string, error)
+	GetSlave(ctx context.Context, key string, slaveId byte) (*model.Slave, error)
 	Update(ctx context.Context, key string, obj []*model.Slave) ([]*model.Slave, error)
 	Delete(ctx context.Context, key string)
 	//DeleteTask(ctx context.Context, RemoteAddr string)
@@ -35,19 +35,19 @@ func (t *SlaveStore) Get(ctx context.Context, key string) ([]*model.Slave, error
 		return nil, data.ErrNotFound
 	}
 }
-func (t *SlaveStore) GetAttributeId(ctx context.Context, key string, slaveId byte) (string, string, error) {
+func (t *SlaveStore) GetSlave(ctx context.Context, key string, slaveId byte) (*model.Slave, error) {
 	s, err := t.Get(ctx, key)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	for _, a := range s {
 		if slaveId == a.SlaveId {
-			return a.AttributeId, a.DeviceId, nil
+			return a, nil
 		}
 	}
 	log.Warnf("attributeId not found by key: %s", key)
-	return "", "", data.ErrNotFound
+	return nil, data.ErrNotFound
 }
 func (t *SlaveStore) Update(ctx context.Context, key string, obj []*model.Slave) ([]*model.Slave, error) {
 	t.cache.Set(key, obj)

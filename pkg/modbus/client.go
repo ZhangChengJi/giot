@@ -46,6 +46,40 @@ func (c *client) ReadInputRegisters(slaveId byte, address, quantity uint16) (res
 	}
 	return c.rtuHandler.Encode(&request)
 }
+func (c *client) WriteSingleRegister(slaveId byte, address, quantity uint16, value []byte) (results []byte, err error) {
+	c.rtuHandler.SlaveId = slaveId
+	request := ProtocolDataUnit{
+		FunctionCode: FuncAnswerSuccessRegisters,
+		Data:         dataBlock1(value, address, quantity),
+	}
+	return c.rtuHandler.Encode(&request)
+}
+func (c *client) ReadCode(data []byte) (pdu *ProtocolDataUnit, err error) {
+	return c.rtuHandler.Decode(data)
+}
+
+// Request:
+//  Function code         : 1 byte (0x10)
+//  Starting address      : 2 bytes
+//  Quantity of outputs   : 2 bytes
+//  Byte count            : 1 byte
+//  Registers value       : N* bytes
+// Response:
+//  Function code         : 1 byte (0x10)
+//  Starting address      : 2 bytes
+//  Quantity of registers : 2 bytes
+func (c *client) WriteMultipleRegisters(address, quantity uint16, value []byte) (results []byte, err error) {
+	if quantity < 1 || quantity > 123 {
+		err = fmt.Errorf("modbus: quantity '%v' must be between '%v' and '%v',", quantity, 1, 123)
+		return
+	}
+	request := ProtocolDataUnit{
+		FunctionCode: FuncCodeWriteMultipleRegisters,
+		Data:         dataBlockSuffix(value, address, quantity),
+	}
+	ad, _ := c.rtuHandler.Encode(&request)
+	return ad, nil
+}
 
 type RtuHandler struct {
 	SlaveId byte
@@ -119,5 +153,36 @@ func dataBlock(value ...uint16) []byte {
 	for i, v := range value {
 		binary.BigEndian.PutUint16(data[i*2:], v)
 	}
+
 	return data
+}
+func dataBlock1(suffix []byte, value ...uint16) []byte {
+	length := 2 * len(value)
+	data := make([]byte, length+len(suffix))
+	for i, v := range value {
+		binary.BigEndian.PutUint16(data[i*2:], v)
+	}
+	//data[length] = uint8(len(suffix))
+	copy(data[length:], suffix)
+	return data
+}
+
+// dataBlockSuffix creates a sequence of uint16 data and append the suffix plus its length.
+func dataBlockSuffix(suffix []byte, value ...uint16) []byte {
+	length := 2 * len(value)
+	data := make([]byte, length+1+len(suffix))
+	for i, v := range value {
+		binary.BigEndian.PutUint16(data[i*2:], v)
+	}
+	data[length] = uint8(len(suffix))
+	copy(data[length+1:], suffix)
+	return data
+}
+
+func responseError(response *ProtocolDataUnit) error {
+	mbError := &ModbusError{FunctionCode: response.FunctionCode}
+	if response.Data != nil && len(response.Data) > 0 {
+		mbError.ExceptionCode = response.Data[0]
+	}
+	return mbError
 }

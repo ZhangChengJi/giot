@@ -8,7 +8,7 @@ import (
 	"giot/internal/scheduler/db"
 	"giot/internal/scheduler/model"
 	"giot/pkg/etcd"
-	"giot/utils/modbus"
+	"giot/pkg/modbus"
 	"reflect"
 	"time"
 )

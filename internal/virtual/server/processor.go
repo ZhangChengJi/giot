@@ -12,7 +12,8 @@ import (
 	"giot/internal/virtual/wheelTimer"
 	"giot/pkg/etcd"
 	"giot/pkg/log"
-	modbus2 "giot/utils/modbus"
+	modbus2 "giot/pkg/modbus"
+	"giot/utils/consts"
 	"giot/utils/runtime"
 	"github.com/RussellLuo/timingwheel"
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
@@ -22,7 +23,7 @@ import (
 )
 
 type Processor struct {
-	modbus     modbus2.Packager
+	modbus     modbus2.Client
 	Stg        etcd.Interface
 	Tw         *timingwheel.TimingWheel
 	Dt         store.DeviceTimerIn
@@ -33,18 +34,19 @@ type Processor struct {
 }
 
 func NewProcessor() *Processor {
-	processor := &Processor{modbus: &modbus2.RtuHandler{}, Stg: etcd.GenEtcdStorage(), Tw: wheelTimer.NewTimer(), Dt: store.NewTimerStore(), al: store.NewAlarmStore(), gu: store.NewGuidStore(), sl: store.NewSlaveStore(), workerPool: goroutine.Default()}
+	processor := &Processor{modbus: modbus2.NewClient(&modbus2.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Tw: wheelTimer.NewTimer(), Dt: store.NewTimerStore(), al: store.NewAlarmStore(), gu: store.NewGuidStore(), sl: store.NewSlaveStore(), workerPool: goroutine.Default()}
 	go processor.watchPoolEtcd()
 	return processor
 }
 
 type ProcessorIn interface {
-	Swift(data <-chan model.RemoteData, reg chan model.RegisterData)
-	ListenCommand(msg <-chan model.ListenMsg)
+	Swift(data <-chan *model.RemoteData, reg chan *model.RegisterData)
+	handle(data *model.RemoteData)
+	ListenCommand(msg <-chan *model.ListenMsg)
 	watchPoolEtcd()
-	//resolve(buf RemoteData)
-	register(data model.RegisterData) error
-	handle(data *model.RegisterData) error
+	activeStore(action, guid, val string) error
+	register(data *model.RegisterData) error
+	deleteTask(action, remoteAddr string)
 }
 
 func (p *Processor) Swift(rdata <-chan *model.RemoteData, reg chan *model.RegisterData) {
@@ -66,34 +68,31 @@ func (p *Processor) Swift(rdata <-chan *model.RemoteData, reg chan *model.Regist
 }
 
 func (p *Processor) handle(data *model.RemoteData) {
-	pdu, err := p.modbus.Decode(data.Frame) //解码
+	pdu, err := p.modbus.ReadCode(data.Frame) //解码
 	if err != nil {
 		log.Errorf("data Decode failed:%s", data.Frame)
 		return
 	}
-	if attributeId, deviceId, err := p.sl.GetAttributeId(context.TODO(), data.RemoteAddr, pdu.SaveId); err != nil { //获取属性ID
+	if slave, err := p.sl.GetSlave(context.TODO(), data.RemoteAddr, pdu.SaveId); err != nil { //获取属性ID
 		log.Errorf("salve:%s not found", pdu.SaveId)
 		return
 	} else {
 		if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
 			log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
 		} else {
-			al.AlarmRule(pdu, attributeId, deviceId)
+			al.AlarmRule(pdu, slave)
 		}
 		da, _ := strconv.ParseFloat(string(data.Frame), 2)
-		device.DataChan <- &model.DeviceMsg{DeviceId: deviceId, Data: da}
+		device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, Name: slave.DeviceName, Data: da, SlaveName: slave.SlaveName}
 
 	}
-
-	//没有告警规则正常上数据
-	//.....
 }
 func (p *Processor) ListenCommand(msg <-chan *model.ListenMsg) {
 	for {
 		select {
 		case m := <-msg:
 			if m.ListenType == 1 { //1代表tcp 任务
-				p.deleteTask("all", m.RemoteAddr)
+				p.deleteTask(consts.ActionAll, m.RemoteAddr)
 
 			} else {
 
@@ -105,7 +104,7 @@ func (p *Processor) ListenCommand(msg <-chan *model.ListenMsg) {
 }
 func (p *Processor) deleteTask(action, remoteAddr string) {
 	switch action {
-	case "all":
+	case consts.ActionAll:
 		timer, err := p.Dt.Get(context.TODO(), remoteAddr)
 		if err != nil {
 			return
@@ -120,11 +119,11 @@ func (p *Processor) deleteTask(action, remoteAddr string) {
 		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
 		p.sl.Delete(context.TODO(), remoteAddr) //从机删除
 		p.al.Delete(context.TODO(), remoteAddr) //告警删除
-	case "code":
+	case consts.ActionCode:
 		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
-	case "slave":
+	case consts.ActionSlave:
 		p.sl.Delete(context.TODO(), remoteAddr) //从机删除
-	case "alarm":
+	case consts.ActionAlarm:
 		p.al.Delete(context.TODO(), remoteAddr) //告警删除
 
 	}
@@ -163,8 +162,8 @@ func (p *Processor) watchPoolEtcd() {
 					if err != nil {
 						return
 					}
-					if ret[2] == "code" {
-						p.deleteTask("all", guid)
+					if ret[2] == consts.ActionCode {
+						p.deleteTask(consts.ActionAll, guid)
 					} else {
 						p.deleteTask(ret[2], guid)
 					}
@@ -181,7 +180,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 		return err
 	}
 	switch action {
-	case "code":
+	case consts.ActionCode:
 		timers, err := p.Dt.Get(context.TODO(), remoteAddr)
 		if err != nil {
 			log.Errorf("Unable to get remoteAddr:%s gnet.conn", remoteAddr)
@@ -218,7 +217,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 			fmt.Println(c)
 		}
 
-	case "slave":
+	case consts.ActionSlave:
 		var slaves []*model.Slave
 		err = json.Unmarshal([]byte(val), &slaves)
 		if err != nil {
@@ -228,7 +227,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 
 		p.sl.Update(context.TODO(), remoteAddr, slaves)
 
-	case "alarm":
+	case consts.ActionAlarm:
 		var alarms []*model.Alarm
 		err = json.Unmarshal([]byte(val), &alarms)
 		if err != nil {
@@ -253,6 +252,8 @@ func (p *Processor) register(data *model.RegisterData) error {
 	remoteAddr := data.C.RemoteAddr().String()
 	if wt, err := p.gu.Get(context.TODO(), string(data.D)); err == nil {
 		if remoteAddr == wt {
+			re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Success)
+			data.C.AsyncWrite(re)
 			log.Warnf("remoteAddr:%s alike no need to register again", remoteAddr)
 			return err
 		}
@@ -262,12 +263,16 @@ func (p *Processor) register(data *model.RegisterData) error {
 	guid := string(data.D)
 	val, err := p.Stg.Get(context.Background(), "transfer/"+guid+"/code")
 	if err != nil {
+		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Error)
+		data.C.AsyncWrite(re)
 		log.Warnf("guid:%v transfer metadata not found.", guid)
 		return err
 	}
 	//3. 认证成功开始配置元数据信息
 	if len(val) > 0 {
 		de, err := metaDataCompile(val)
+		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Success)
+		data.C.AsyncWrite(re)
 		if err != nil {
 			log.Errorf("guid:%v transfer metadata transform error.", guid)
 			return err
@@ -292,7 +297,7 @@ func (p *Processor) register(data *model.RegisterData) error {
 		//先存储一下guid和远程地址对应关系
 		p.gu.Create(context.TODO(), guid, remoteAddr)
 		//5. 获取从机信息
-		sa, err := p.Stg.Get(context.Background(), "transfer/"+guid+"/salve")
+		sa, err := p.Stg.Get(context.Background(), "device/"+guid+"/salve")
 		var slaves []*model.Slave
 		err = json.Unmarshal([]byte(sa), &slaves)
 		if err != nil {
@@ -301,7 +306,7 @@ func (p *Processor) register(data *model.RegisterData) error {
 		}
 
 		//6. 获取告警规则
-		tr, err := p.Stg.Get(context.Background(), "transfer/"+guid+"/alarm")
+		tr, err := p.Stg.Get(context.Background(), "device/"+guid+"/alarm")
 		var alarms []*model.Alarm
 		err = json.Unmarshal([]byte(tr), &alarms)
 		if err != nil {

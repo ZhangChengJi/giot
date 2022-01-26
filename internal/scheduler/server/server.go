@@ -8,7 +8,7 @@ import (
 	"giot/internal/scheduler/transfer"
 	"giot/pkg/etcd"
 	"giot/pkg/log"
-	"giot/utils/modbus"
+	"giot/pkg/modbus"
 	"github.com/xormplus/xorm"
 	"os"
 

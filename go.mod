@@ -13,6 +13,7 @@ require (
 	github.com/RussellLuo/timingwheel v0.0.0-20201029015908-64de9d088c74
 	github.com/agrison/go-tablib v0.0.0-20160310143025-4930582c22ee // indirect
 	github.com/agrison/mxj v0.0.0-20160310142625-1269f8afb3b4 // indirect
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1458
 	github.com/bndr/gotabulate v1.1.2 // indirect
 	github.com/clbanning/mxj v1.8.4 // indirect
 	github.com/coreos/bbolt v0.0.0-00010101000000-000000000000 // indirect
@@ -23,7 +24,6 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/gin-gonic/gin v1.7.7
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
@@ -34,7 +34,7 @@ require (
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/orcaman/concurrent-map v1.0.0
 	github.com/panjf2000/gnet v1.6.4
-	github.com/satori/go.uuid v1.2.0
+	github.com/pkg/errors v0.8.1
 	github.com/shiningrush/droplet v0.3.0
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.3.0
@@ -50,6 +50,7 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.etcd.io/etcd v3.3.25+incompatible
 	go.uber.org/zap v1.20.0
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/flosch/pongo2.v3 v3.0.0-20141028000813-5e81b817a0c4 // indirect
 	gorm.io/driver/mysql v1.2.3

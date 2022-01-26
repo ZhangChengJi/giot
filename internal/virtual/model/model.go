@@ -158,6 +158,33 @@ func (ExecuteAction) TableName() string {
 	return "execute_action"
 }
 
+type NotifyConfig struct {
+	Id            string `json:"id" gorm:"primarykey；column:id;"`
+	Name          string `json:"name" form:"name" gorm:"column:name;comment:告警规则名称;size:100;"`
+	Type          string `json:"type" form:"type" gorm:"column:type;comment:执行动作类型（1：消息通知；2：设备通知）;size:10;"`
+	Provider      string `json:"provider" form:"provider" gorm:"column:provider;comment:服务商(aliyun:阿里云；aliyunSms：阿里云短信服务；wechat：微信通知);size:10;"`
+	Configuration string `json:"configuration" form:"configuration" gorm:"column:configuration;comment:配置内容;size:10;"`
+}
+
+// TableName NotifyConfig 表名
+func (NotifyConfig) TableName() string {
+	return "notify_config"
+}
+
+type NotifyTemplate struct {
+	Id             string `json:"id" gorm:"primarykey；column:id;"`
+	NotifyConfigId string `json:"notifyConfigId" gorm:"primarykey；column:notify_config_id;"`
+	Name           string `json:"name" form:"name" gorm:"column:name;comment:模板名称;size:100;"`
+	Type           string `json:"type" form:"type" gorm:"column:type;comment:执行动作类型（1：消息通知；2：设备通知）;size:10;"`
+	Provider       string `json:"provider" form:"provider" gorm:"column:provider;comment:服务商(aliyun:阿里云；aliyunSms：阿里云短信服务；wechat：微信通知);size:10;"`
+	Template       string `json:"template" form:"template" gorm:"column:template;comment:模板内容;size:10;"`
+}
+
+// TableName NotifyConfig 表名
+func (NotifyTemplate) TableName() string {
+	return "notify_template"
+}
+
 //type Device struct {
 //	Guid            string     //设备ID
 //	Name            string     //设备名称
@@ -235,8 +262,10 @@ type ListenMsg struct {
 type Comm int8
 
 type DeviceMsg struct {
+	Type      string  `json:"type"`
 	DeviceId  string  `json:"deviceId"`
 	Name      string  `json:"name" `
+	SlaveName string  `json:"slaveName"`
 	ProductId string  `json:"productId"`
 	Data      float64 `json:"data"`
 	Actions   []*Action

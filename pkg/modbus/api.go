@@ -7,4 +7,8 @@ type Client interface {
 	// ReadHoldingRegisters reads the contents of a contiguous block of
 	// holding registers in a remote logic and returns register value.
 	ReadHoldingRegisters(slaveId byte, address, quantity uint16) (results []byte, err error)
+	WriteSingleRegister(slaveId byte, address, quantity uint16, value []byte) (results []byte, err error)
+	WriteMultipleRegisters(address, quantity uint16, value []byte) (results []byte, err error)
+
+	ReadCode(data []byte) (pdu *ProtocolDataUnit, err error)
 }

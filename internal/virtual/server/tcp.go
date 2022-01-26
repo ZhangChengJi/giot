@@ -27,7 +27,6 @@ func (s *server) setupTcp() {
 	go pro.Swift(t.DataChan, t.RegisterChan)
 	go pro.ListenCommand(t.ListenMsgChan)
 	device.Init()
-	//	t.aaa()
 	log.Fatalf("gent tcp event loop start failed: %v", gnet.Serve(t, fmt.Sprintf("tcp://%v", config.Addr), gnet.WithMulticore(config.Multicore), gnet.WithTCPKeepAlive(5*time.Second), gnet.WithReusePort(config.Reuseport)))
 }
 

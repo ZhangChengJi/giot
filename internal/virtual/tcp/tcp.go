@@ -3,7 +3,7 @@ package tcp
 import (
 	"fmt"
 	"giot/internal/virtual/model"
-	"giot/utils/modbus"
+	modbus2 "giot/pkg/modbus"
 	"github.com/panjf2000/gnet"
 	"log"
 	"sync"
@@ -83,13 +83,13 @@ func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.A
 	return
 }
 
-func (ps *TcpServer) aaa() {
+func (ps *TcpServer) Aaa() {
 	fmt.Println("当前时间：", time.Now())
-	myTicker := time.NewTicker(time.Second * 30) //
+	myTicker := time.NewTicker(time.Second * 5) //
 	go func() {
 		for {
 			<-myTicker.C
-			r, _ := modbus.NewClient(&modbus.RtuHandler{}).ReadHoldingRegisters(1, 0, 1)
+			r, _ := modbus2.NewClient(&modbus2.RtuHandler{}).WriteSingleRegister(1, 1, 1, modbus2.Success)
 			fmt.Printf("%X", r)
 			ps.connectedSockets.Range(func(key, value interface{}) bool {
 				c := value.(gnet.Conn)

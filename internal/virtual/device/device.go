@@ -46,7 +46,7 @@ func (d *device) listenLoop() {
 
 //发布消息
 func (d *device) Insert(data *model.DeviceMsg) {
-	topic := append([]byte("transfer/"), data.DeviceId...)
+	topic := append([]byte("transfer/data/"), data.DeviceId...)
 	topic = append(topic, ""...)
 	d.Publish(string(topic), data)
 
