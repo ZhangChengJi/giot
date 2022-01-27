@@ -232,10 +232,10 @@ type Alarm struct {
 }
 
 type Trigger struct { //触发条件
-	Type     string `json:"type"`     //触发条件类型
-	ModelId  string `json:"modelId"`  //属性ID
-	Operator string `json:"operator"` //条件
-	Val      []byte `json:"val"`      //数据值
+	Type     string  `json:"type"`     //触发条件类型
+	ModelId  string  `json:"modelId"`  //属性ID
+	Operator string  `json:"operator"` //条件
+	Val      float64 `json:"val"`      //数据值
 }
 
 type Action struct { //执行动作
@@ -260,13 +260,3 @@ type ListenMsg struct {
 }
 
 type Comm int8
-
-type DeviceMsg struct {
-	Type      string  `json:"type"`
-	DeviceId  string  `json:"deviceId"`
-	Name      string  `json:"name" `
-	SlaveName string  `json:"slaveName"`
-	ProductId string  `json:"productId"`
-	Data      float64 `json:"data"`
-	Actions   []*Action
-}

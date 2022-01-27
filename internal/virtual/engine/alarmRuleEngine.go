@@ -3,10 +3,7 @@ package engine
 import (
 	"giot/internal/virtual/device"
 	"giot/internal/virtual/model"
-	"giot/pkg/modbus"
-	"giot/utils"
 	"giot/utils/consts"
-	"strconv"
 )
 
 var EnChan = make(chan model.RemoteData, 1024)
@@ -17,8 +14,8 @@ var EnChan = make(chan model.RemoteData, 1024)
 //}
 
 type Interface interface {
-	AlarmRule(unit *modbus.ProtocolDataUnit, slave *model.Slave)
-	Trigger(data []byte, slave *model.Slave)
+	AlarmRule(unit float64, slave *model.Slave)
+	Trigger(data float64, slave *model.Slave)
 	Action(guid, name, productId string, data float64, actions []*model.Action)
 }
 
@@ -32,47 +29,21 @@ func NewAlarmRule(alarms []*model.Alarm) *AlarmRuleEngine {
 	}
 }
 
-func (engine *AlarmRuleEngine) AlarmRule(unit *modbus.ProtocolDataUnit, slave *model.Slave) {
-	engine.Trigger(unit.Data, slave)
+func (engine *AlarmRuleEngine) AlarmRule(data float64, slave *model.Slave) {
+	engine.Trigger(data, slave)
 }
 
-func (engine *AlarmRuleEngine) Trigger(data []byte, slave *model.Slave) {
+func (engine *AlarmRuleEngine) Trigger(data float64, slave *model.Slave) {
+	var b bool
 	for _, alarm := range engine.Alarms { //循环告警规则
 		for _, trigger := range alarm.Triggers { //循环告警触发条件
 			if trigger.Type == "properties" { //判断是否是属性
 				if trigger.ModelId == slave.AttributeId { //判断是否当前属性ID
-					switch trigger.Operator { //判断比对条件
-					case "eq": //=
-
-						as, _ := strconv.ParseUint(string(data), 16, 32)
-						as1, _ := strconv.ParseUint(string(trigger.Val), 16, 32)
-						if as == as1 {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, utils.ByteToFloat64(data), alarm.Actions)
-							break
-						}
-					case "not": //<>
-						if utils.ByteToFloat64(data) != utils.ByteToFloat64(trigger.Val) {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, utils.ByteToFloat64(data), alarm.Actions)
-							break
-						}
-					case "gt": //>
-						if utils.ByteToFloat64(data) > utils.ByteToFloat64(trigger.Val) {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, utils.ByteToFloat64(data), alarm.Actions)
-							break
-						}
-					case "lt": //<
-						if utils.ByteToFloat64(data) < utils.ByteToFloat64(trigger.Val) {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, utils.ByteToFloat64(data), alarm.Actions)
-							break
-						}
-					case "gte": //>=
-						if utils.ByteToFloat64(data) >= utils.ByteToFloat64(trigger.Val) {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, utils.ByteToFloat64(data), alarm.Actions)
-							break
-						}
-					case "lte": //<=
-						if utils.ByteToFloat64(data) <= utils.ByteToFloat64(trigger.Val) {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, utils.ByteToFloat64(data), alarm.Actions)
+					switch trigger.Operator { //判断比对条件(任意)
+					case consts.EQ, consts.NOT, consts.GT, consts.LT, consts.GTE, consts.LTE: //=
+						if data == trigger.Val {
+							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, data, alarm.Actions)
+							b = true
 							break
 						}
 
@@ -81,11 +52,30 @@ func (engine *AlarmRuleEngine) Trigger(data []byte, slave *model.Slave) {
 				}
 			}
 		}
+		if !b {
+			device.DataChan <- &model.DeviceMsg{
+				Type:      consts.DATA,
+				Status:    true,
+				DeviceId:  slave.DeviceId,
+				Name:      slave.SlaveName,
+				ProductId: slave.ProductId,
+				Data:      data,
+			}
+		}
 	}
 }
 func (engine *AlarmRuleEngine) Action(guid, name, productId string, data float64, actions []*model.Action) {
+	device.DataChan <- &model.DeviceMsg{
+		Type:      consts.DATA,
+		Status:    false,
+		DeviceId:  guid,
+		Name:      name,
+		ProductId: productId,
+		Data:      data,
+	}
 	device.AlarmChan <- &model.DeviceMsg{
 		Type:      consts.ALARM,
+		Status:    false,
 		DeviceId:  guid,
 		Name:      name,
 		ProductId: productId,

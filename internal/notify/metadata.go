@@ -11,6 +11,6 @@ type Metadata struct {
 
 type Template struct {
 	DeviceName string
-	SlaveName  string
+	SlaveId    int
 	Value      float64
 }

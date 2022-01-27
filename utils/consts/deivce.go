@@ -13,4 +13,11 @@ const (
 	SMS    = "sms"
 	VOICE  = "voice"
 	WECHAT = "wechat"
+
+	EQ  = "eq"  //==
+	NOT = "not" //<>
+	GT  = "gt"  //>
+	LT  = "lt"  //<
+	GTE = "gte" //>=
+	LTE = "lte" //<=
 )

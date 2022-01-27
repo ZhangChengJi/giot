@@ -77,13 +77,14 @@ func (p *Processor) handle(data *model.RemoteData) {
 		log.Errorf("salve:%s not found", pdu.SaveId)
 		return
 	} else {
+		da, _ := strconv.ParseFloat(string(data.Frame), 2)
+
 		if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
+			device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
 			log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
 		} else {
-			al.AlarmRule(pdu, slave)
+			al.AlarmRule(da, slave)
 		}
-		da, _ := strconv.ParseFloat(string(data.Frame), 2)
-		device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, Name: slave.DeviceName, Data: da, SlaveName: slave.SlaveName}
 
 	}
 }
@@ -337,18 +338,3 @@ func metaDataCompile(val string) (*model.TimerActive, error) {
 	}
 	return ma, nil
 }
-
-//func (p *Processor) resolve(buf RemoteData) {
-//	length := len(buf.Frame)
-//	if length > 0 && length > 7 {
-//		if length == 24 {
-//			err := p.register()
-//			if err != nil {
-//				return
-//			}
-//		} else {
-//			<
-//		}
-//	}
-//
-//}

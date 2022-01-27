@@ -28,6 +28,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
+	github.com/json-iterator/go v1.1.12
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lithammer/dedent v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.10 // indirect
@@ -36,14 +37,17 @@ require (
 	github.com/panjf2000/gnet v1.6.4
 	github.com/pkg/errors v0.8.1
 	github.com/shiningrush/droplet v0.3.0
+	github.com/shopspring/decimal v1.3.1
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
+	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/taosdata/driver-go/v2 v2.0.0
 	github.com/tealeg/xlsx v1.0.5 // indirect
 	github.com/tidwall/gjson v1.12.1
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
+	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	github.com/xormplus/builder v0.0.0-20200331055651-240ff40009be // indirect
 	github.com/xormplus/xorm v0.0.0-20210822100304-4e1d4fcc1e67

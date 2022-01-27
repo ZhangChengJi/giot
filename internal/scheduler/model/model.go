@@ -233,11 +233,3 @@ type ListenMsg struct {
 }
 
 type Comm int8
-
-type DeviceMsg struct {
-	DeviceId  string  `json:"deviceId"`
-	Name      string  `json:"name" `
-	ProductId string  `json:"productId"`
-	Data      float64 `json:"data"`
-	Actions   []*Action
-}
