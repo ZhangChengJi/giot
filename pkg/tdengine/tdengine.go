@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"giot/conf"
 	"giot/pkg/log"
-	_ "github.com/taosdata/driver-go/taosSql"
+	_ "github.com/taosdata/driver-go/v2/taosSql"
 	"strconv"
 )
 

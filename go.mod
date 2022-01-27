@@ -40,7 +40,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	github.com/syndtr/goleveldb v1.0.0 // indirect
-	github.com/taosdata/driver-go v0.0.0-20210609071024-b8f76da4a708
+	github.com/taosdata/driver-go/v2 v2.0.0
 	github.com/tealeg/xlsx v1.0.5 // indirect
 	github.com/tidwall/gjson v1.12.1
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
