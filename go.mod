@@ -37,7 +37,6 @@ require (
 	github.com/panjf2000/gnet v1.6.4
 	github.com/pkg/errors v0.8.1
 	github.com/shiningrush/droplet v0.3.0
-	github.com/shopspring/decimal v1.3.1
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
