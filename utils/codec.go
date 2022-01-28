@@ -4,6 +4,7 @@ import (
 	"errors"
 	"giot/utils/json"
 	"github.com/vmihailenco/msgpack/v5"
+	"math/rand"
 )
 
 var ErrUnsupportCodec = errors.New("unsupported codec")
@@ -40,4 +41,14 @@ func FromKafkaBytes(bytes []byte, record Codec) error {
 	default:
 		return ErrUnsupportCodec
 	}
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func RandStringBytesRmndr(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
+	}
+	return string(b)
 }

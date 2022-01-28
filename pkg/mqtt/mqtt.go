@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"giot/conf"
 	"giot/pkg/log"
+	"giot/utils"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"time"
 )
@@ -15,7 +16,7 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 func New(conf *conf.Mqtt) (mqtt.Client, error) {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%v", conf.Host, conf.Port))
-	opts.SetClientID("giot_virtual")
+	opts.SetClientID(utils.RandStringBytesRmndr(10))
 	opts.SetKeepAlive(5 * time.Second)
 	//opts.SetDefaultPublishHandler(f)
 	opts.SetPingTimeout(1 * time.Second)
