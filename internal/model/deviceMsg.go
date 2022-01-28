@@ -9,14 +9,15 @@ import (
 )
 
 type DeviceMsg struct {
-	Type      string  `json:"type"`
-	Status    bool    `json:"status"`
-	DeviceId  string  `json:"deviceId"`
-	Name      string  `json:"name" `
-	SlaveId   int     `json:"slaveId"`
-	ProductId string  `json:"productId"`
-	ModelId   string  `json:"modelId"`
-	Data      float64 `json:"data"`
+	Ts        time.Time `json:"timestamp"`
+	Type      string    `json:"type"`
+	Status    bool      `json:"status"`
+	DeviceId  string    `json:"deviceId"`
+	Name      string    `json:"name" `
+	SlaveId   int       `json:"slaveId"`
+	ProductId string    `json:"productId"`
+	ModelId   string    `json:"modelId"`
+	Data      float64   `json:"data"`
 	Actions   []*Action
 }
 
@@ -73,7 +74,7 @@ func (r *DeviceMsg) TaosCols() []string {
 // Values
 func (r *DeviceMsg) TaosValues() []interface{} {
 	var values []interface{}
-	values = append(values, time.Now())
+	values = append(values, r.Ts)
 	if r.Type == consts.DATA {
 		values = append(values, r.Data, r.Status)
 	} else {
