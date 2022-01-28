@@ -3,8 +3,12 @@ package transfer
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"giot/utils"
+	"giot/utils/json"
+	"golang.org/x/text/message"
+	"runtime"
+
 	"giot/internal/model"
 	"giot/internal/notify"
 	"giot/internal/notify/sms"
@@ -12,11 +16,9 @@ import (
 	broker "giot/internal/scheduler/mqtt"
 	"giot/pkg/log"
 	"giot/pkg/queue"
-	"giot/utils"
 	"giot/utils/consts"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"gorm.io/gorm"
-	"runtime"
 	"time"
 )
 
@@ -27,7 +29,7 @@ type Transfer struct {
 	td        *sql.DB
 	db        *gorm.DB
 	dataChan  chan []byte
-	alarmChan chan []byte
+	alarmChan chan *model.DeviceMsg
 	notifier  *notify.Notify
 	q         *queue.Queue
 }
@@ -39,7 +41,7 @@ func SetupTransfer() {
 		},
 		td:        db.Td,
 		db:        db.DB,
-		alarmChan: make(chan []byte, 1024),
+		alarmChan: make(chan *model.DeviceMsg, 1024),
 		notifier:  notify.New(),
 		// Prepare batch queue
 		q: queue.NewWithOption(qOption),
@@ -54,15 +56,29 @@ func (t *Transfer) ListenMqtt() {
 	t.mqtt.Client.Subscribe("transfer/alarm/#", 0, t.alarmHandler)
 }
 func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
-	t.q.Enqueue(msg.Payload())
+	var device model.DeviceMsg
+	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
+		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
+		return
+	}
+	t.q.Enqueue(device)
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
 func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
-	t.alarmChan <- msg.Payload()
-	t.q.Enqueue(msg.Payload())
+	var device model.DeviceMsg
+	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
+		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
+		return
+	}
+
+	t.alarmChan <- &device
+	t.q.Enqueue(device)
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
+}
+func FromMqttBytes(bytes []byte, device *model.DeviceMsg) error {
+	return json.Unmarshal(bytes, &device)
 }
 
 func (t *Transfer) consume(workers int) {
@@ -98,7 +114,7 @@ func (t *Transfer) notifyProvider(action string, metadata *notify.Metadata, temp
 		sms := sms.New(metadata.RegionId, metadata.AccessKeyId, metadata.AccessSecret)
 		sms.AddReceivers(metadata.PhoneNumbers)
 		t.notifier.UseServices(sms)
-		t.notifier.Send(context.Background(), metadata.TemplateCode, template) //TODO 是否记录发送状态
+		t.notifier.Send(context.Background(), metadata.SignName, metadata.TemplateCode, template) //TODO 是否记录发送状态
 	case consts.VOICE:
 
 	}
@@ -107,23 +123,19 @@ func (t *Transfer) notifyLoop() {
 	for {
 		select {
 		case alarm := <-t.alarmChan:
-			var msg model.DeviceMsg
-			if err := json.Unmarshal(alarm, &msg); err != nil {
-				log.Errorf("json Unmarshal failed:%v", err)
-				return
-			}
-			for _, action := range msg.Actions {
+			for _, action := range alarm.Actions {
 				metadata, err := t.queryNotifyData(action.NotifierId, action.TemplateId)
 				if err != nil {
 					log.Errorf("query notify metadata failed")
 					return
 				}
 				template := &notify.Template{
-					DeviceName: msg.Name,
-					SlaveId:    msg.SlaveId,
-					Value:      msg.Data,
+					DeviceName: alarm.Name,
+					SlaveId:    alarm.SlaveId,
+					Value:      alarm.Data,
 				}
 				te, _ := json.Marshal(template)
+				//m := "{\"msisdn\": \"18866890232\", \"name\": \"测试\", \"date\": \"20201-20202\"}"
 
 				t.notifyProvider(action.NotifyType, metadata, string(te))
 			}

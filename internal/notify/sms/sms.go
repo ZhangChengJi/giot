@@ -29,11 +29,12 @@ func (s *sms) AddReceivers(phone string) {
 	s.phoneNumbers = phone
 }
 
-func (s sms) Send(ctx context.Context, templateCode, message string) error {
+func (s sms) Send(ctx context.Context, signName, templateCode, message string) error {
 	var err error
 	client, err := dysmsapi.NewClientWithAccessKey(s.regionId, s.accessKeyId, s.accessSecret)
+	s.request.Scheme = "https"
 	s.request.TemplateCode = templateCode
-	s.request.SignName = s.signName
+	s.request.SignName = signName
 	s.request.PhoneNumbers = s.phoneNumbers
 	s.request.TemplateParam = message
 	select {
@@ -42,9 +43,9 @@ func (s sms) Send(ctx context.Context, templateCode, message string) error {
 	default:
 		response, err := client.SendSms(s.request)
 		if err != nil {
-			err = errors.Wrap(err, "failed to send mail")
+			err = errors.Wrap(err, "failed to send sms")
 		}
-		fmt.Printf("response is %#v\n", response)
+		fmt.Printf("response is %v\n", response.Message)
 
 	}
 	return err

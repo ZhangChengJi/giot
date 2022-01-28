@@ -20,7 +20,7 @@ func New(conf *conf.Mqtt) (mqtt.Client, error) {
 	//opts.SetDefaultPublishHandler(f)
 	opts.SetPingTimeout(1 * time.Second)
 	opts.SetCleanSession(false)
-	opts.SetDefaultPublishHandler(messagePubHandler)
+	//opts.SetDefaultPublishHandler(messagePubHandler)
 	opts.SetUsername(conf.Username)
 	opts.SetPassword(conf.Password)
 	opts.OnConnect = connectHandler

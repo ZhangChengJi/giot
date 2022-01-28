@@ -1,8 +1,6 @@
 package notify
 
 import (
-	"context"
-	"giot/internal/notify/sms"
 	"github.com/pkg/errors"
 )
 
@@ -25,18 +23,4 @@ func New() *Notify {
 	}
 
 	return notifier
-}
-
-func Provider(action string) {
-	notifier := New()
-	switch action {
-	case "sms":
-		sms := sms.New("", "", "")
-		sms.AddReceivers("")
-		notifier.UseServices(sms)
-		notifier.Send(context.Background(), "", "")
-	case "voice":
-
-	}
-
 }

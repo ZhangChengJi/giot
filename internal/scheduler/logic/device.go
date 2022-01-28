@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"giot/internal/model"
 	"giot/internal/scheduler/db"
-	"giot/internal/scheduler/model"
 	"giot/pkg/etcd"
 	"giot/pkg/modbus"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -101,11 +102,12 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 				db.DB.Where(&model.Condition{AlarmRuleId: alarm.Id}).Find(&condition)
 				var triggers []*model.Trigger
 				for _, c := range condition {
+					da, _ := strconv.ParseFloat(string(c.Values), 2)
 					trigger := &model.Trigger{
 						Type:     c.ConditionType,
 						ModelId:  c.AttributeId,
 						Operator: c.SymbolType,
-						Val:      []byte(c.Values),
+						Val:      da,
 					}
 					triggers = append(triggers, trigger)
 				}
