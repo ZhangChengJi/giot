@@ -56,9 +56,9 @@ func (r *DeviceMsg) TaosTags() []interface{} {
 func (r *DeviceMsg) TaosTable() string {
 	switch r.Type {
 	case consts.DATA:
-		return strings.Join([]string{"device_data"}, r.DeviceId)
+		return strings.Join([]string{"device_data", r.DeviceId}, "")
 	case consts.ALARM:
-		return strings.Join([]string{"device_alarm"}, r.DeviceId)
+		return strings.Join([]string{"device_alarm", r.DeviceId}, "")
 	default:
 		return ""
 
