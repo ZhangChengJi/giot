@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	model2 "giot/internal/model"
+	"giot/internal/model"
 	"giot/internal/notify"
 	"giot/internal/notify/sms"
 	"giot/internal/scheduler/db"
@@ -107,7 +107,7 @@ func (t *Transfer) notifyLoop() {
 	for {
 		select {
 		case alarm := <-t.alarmChan:
-			var msg model2.DeviceMsg
+			var msg model.DeviceMsg
 			if err := json.Unmarshal(alarm, &msg); err != nil {
 				log.Errorf("json Unmarshal failed:%v", err)
 				return
@@ -134,7 +134,7 @@ func (t *Transfer) notifyLoop() {
 }
 
 func (t *Transfer) queryNotifyData(cid, tid string) (*notify.Metadata, error) {
-	var config model2.NotifyConfig
+	var config model.NotifyConfig
 	err := t.db.First(&config, cid).Error
 	if err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func (t *Transfer) queryNotifyData(cid, tid string) (*notify.Metadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	var template model2.NotifyTemplate
+	var template model.NotifyTemplate
 	err = t.db.First(&template, tid).Error
 	if err != nil {
 		return nil, err
