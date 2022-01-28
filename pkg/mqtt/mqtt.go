@@ -15,7 +15,7 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 func New(conf *conf.Mqtt) (mqtt.Client, error) {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%v", conf.Host, conf.Port))
-	opts.SetClientID("mqttx_2e81508d")
+	opts.SetClientID("giot_virtual")
 	opts.SetKeepAlive(5 * time.Second)
 	//opts.SetDefaultPublishHandler(f)
 	opts.SetPingTimeout(1 * time.Second)
@@ -37,10 +37,10 @@ func New(conf *conf.Mqtt) (mqtt.Client, error) {
 }
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	fmt.Println("mqtt连接成功...")
+	fmt.Println("mqtt连接成功...\n")
 }
 
 // 连接丢失的回调
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Printf("链接丢失: %v", err)
+	fmt.Printf("mqtt连接丢失: %v\n", err.Error())
 }

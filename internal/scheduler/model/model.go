@@ -35,7 +35,7 @@ type Device struct {
 }
 
 func (Device) TableName() string {
-	return "transfer"
+	return "device"
 }
 
 // Detector 结构体
