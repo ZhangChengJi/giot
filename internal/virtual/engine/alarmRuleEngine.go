@@ -1,12 +1,12 @@
 package engine
 
 import (
+	model2 "giot/internal/model"
 	"giot/internal/virtual/device"
-	"giot/internal/virtual/model"
 	"giot/utils/consts"
 )
 
-var EnChan = make(chan model.RemoteData, 1024)
+var EnChan = make(chan model2.RemoteData, 1024)
 
 //func loop() {
 //
@@ -14,26 +14,26 @@ var EnChan = make(chan model.RemoteData, 1024)
 //}
 
 type Interface interface {
-	AlarmRule(unit float64, slave *model.Slave)
-	Trigger(data float64, slave *model.Slave)
-	Action(guid, name, productId string, data float64, actions []*model.Action)
+	AlarmRule(unit float64, slave *model2.Slave)
+	Trigger(data float64, slave *model2.Slave)
+	Action(guid, name, productId string, data float64, actions []*model2.Action)
 }
 
 type AlarmRuleEngine struct {
-	Alarms []*model.Alarm
+	Alarms []*model2.Alarm
 }
 
-func NewAlarmRule(alarms []*model.Alarm) *AlarmRuleEngine {
+func NewAlarmRule(alarms []*model2.Alarm) *AlarmRuleEngine {
 	return &AlarmRuleEngine{
 		Alarms: alarms,
 	}
 }
 
-func (engine *AlarmRuleEngine) AlarmRule(data float64, slave *model.Slave) {
+func (engine *AlarmRuleEngine) AlarmRule(data float64, slave *model2.Slave) {
 	engine.Trigger(data, slave)
 }
 
-func (engine *AlarmRuleEngine) Trigger(data float64, slave *model.Slave) {
+func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
 	var b bool
 	for _, alarm := range engine.Alarms { //循环告警规则
 		for _, trigger := range alarm.Triggers { //循环告警触发条件
@@ -53,7 +53,7 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model.Slave) {
 			}
 		}
 		if !b {
-			device.DataChan <- &model.DeviceMsg{
+			device.DataChan <- &model2.DeviceMsg{
 				Type:      consts.DATA,
 				Status:    true,
 				DeviceId:  slave.DeviceId,
@@ -64,8 +64,8 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model.Slave) {
 		}
 	}
 }
-func (engine *AlarmRuleEngine) Action(guid, name, productId string, data float64, actions []*model.Action) {
-	device.DataChan <- &model.DeviceMsg{
+func (engine *AlarmRuleEngine) Action(guid, name, productId string, data float64, actions []*model2.Action) {
+	device.DataChan <- &model2.DeviceMsg{
 		Type:      consts.DATA,
 		Status:    false,
 		DeviceId:  guid,
@@ -73,7 +73,7 @@ func (engine *AlarmRuleEngine) Action(guid, name, productId string, data float64
 		ProductId: productId,
 		Data:      data,
 	}
-	device.AlarmChan <- &model.DeviceMsg{
+	device.AlarmChan <- &model2.DeviceMsg{
 		Type:      consts.ALARM,
 		Status:    false,
 		DeviceId:  guid,

@@ -1,8 +1,6 @@
 package mqtt
 
 import (
-	"fmt"
-	"giot/pkg/log"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -20,16 +18,16 @@ func InitMqtt(c mqtt.Client) {
 }
 
 //Subscribe 订阅
-func (b *Broker) Subscribe(topic string) {
-	if token := b.Client.Subscribe(topic, 0, func(client mqtt.Client, message mqtt.Message) {
-
-	}); token.Wait() && token.Error() != nil {
-		fmt.Println(token.Error())
-		log.Error("subscribe topic:%s failed", topic)
-		return
-
-	}
-}
+//func (b *Broker) Subscribe(topic string) {
+//	if token := b.Client.Subscribe(topic, 0, func(client mqtt.Client, message mqtt.Message) {
+//
+//	}); token.Wait() && token.Error() != nil {
+//		fmt.Println(token.Error())
+//		log.Error("subscribe topic:%s failed", topic)
+//		return
+//
+//	}
+//}
 
 // Publish 发布
 func (b *Broker) Publish(topic string, data interface{}) {

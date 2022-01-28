@@ -2,7 +2,7 @@ package tcp
 
 import (
 	"fmt"
-	"giot/internal/virtual/model"
+	"giot/internal/model"
 	modbus2 "giot/pkg/modbus"
 	"github.com/panjf2000/gnet"
 	"log"

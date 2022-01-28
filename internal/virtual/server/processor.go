@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	model2 "giot/internal/model"
 	"giot/internal/virtual/device"
 	"giot/internal/virtual/engine"
-	"giot/internal/virtual/model"
 	"giot/internal/virtual/store"
 	"giot/internal/virtual/wheelTimer"
 	"giot/pkg/etcd"
@@ -40,16 +40,16 @@ func NewProcessor() *Processor {
 }
 
 type ProcessorIn interface {
-	Swift(data <-chan *model.RemoteData, reg chan *model.RegisterData)
-	handle(data *model.RemoteData)
-	ListenCommand(msg <-chan *model.ListenMsg)
+	Swift(data <-chan *model2.RemoteData, reg chan *model2.RegisterData)
+	handle(data *model2.RemoteData)
+	ListenCommand(msg <-chan *model2.ListenMsg)
 	watchPoolEtcd()
 	activeStore(action, guid, val string) error
-	register(data *model.RegisterData) error
+	register(data *model2.RegisterData) error
 	deleteTask(action, remoteAddr string)
 }
 
-func (p *Processor) Swift(rdata <-chan *model.RemoteData, reg chan *model.RegisterData) {
+func (p *Processor) Swift(rdata <-chan *model2.RemoteData, reg chan *model2.RegisterData) {
 
 	for {
 		select {
@@ -67,7 +67,7 @@ func (p *Processor) Swift(rdata <-chan *model.RemoteData, reg chan *model.Regist
 	}
 }
 
-func (p *Processor) handle(data *model.RemoteData) {
+func (p *Processor) handle(data *model2.RemoteData) {
 	pdu, err := p.modbus.ReadCode(data.Frame) //解码
 	if err != nil {
 		log.Errorf("data Decode failed:%s", data.Frame)
@@ -80,7 +80,7 @@ func (p *Processor) handle(data *model.RemoteData) {
 		da, _ := strconv.ParseFloat(string(data.Frame), 2)
 
 		if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
-			device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
+			device.DataChan <- &model2.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
 			log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
 		} else {
 			al.AlarmRule(da, slave)
@@ -88,7 +88,7 @@ func (p *Processor) handle(data *model.RemoteData) {
 
 	}
 }
-func (p *Processor) ListenCommand(msg <-chan *model.ListenMsg) {
+func (p *Processor) ListenCommand(msg <-chan *model2.ListenMsg) {
 	for {
 		select {
 		case m := <-msg:
@@ -219,7 +219,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 		}
 
 	case consts.ActionSlave:
-		var slaves []*model.Slave
+		var slaves []*model2.Slave
 		err = json.Unmarshal([]byte(val), &slaves)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -229,7 +229,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 		p.sl.Update(context.TODO(), remoteAddr, slaves)
 
 	case consts.ActionAlarm:
-		var alarms []*model.Alarm
+		var alarms []*model2.Alarm
 		err = json.Unmarshal([]byte(val), &alarms)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -247,7 +247,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 /**
   注册
 */
-func (p *Processor) register(data *model.RegisterData) error {
+func (p *Processor) register(data *model2.RegisterData) error {
 	//开始
 	//1. 判断是否注册过，如果注册过无需重复注册
 	remoteAddr := data.C.RemoteAddr().String()
@@ -299,7 +299,7 @@ func (p *Processor) register(data *model.RegisterData) error {
 		p.gu.Create(context.TODO(), guid, remoteAddr)
 		//5. 获取从机信息
 		sa, err := p.Stg.Get(context.Background(), "device/"+guid+"/salve")
-		var slaves []*model.Slave
+		var slaves []*model2.Slave
 		err = json.Unmarshal([]byte(sa), &slaves)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -308,7 +308,7 @@ func (p *Processor) register(data *model.RegisterData) error {
 
 		//6. 获取告警规则
 		tr, err := p.Stg.Get(context.Background(), "device/"+guid+"/alarm")
-		var alarms []*model.Alarm
+		var alarms []*model2.Alarm
 		err = json.Unmarshal([]byte(tr), &alarms)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -329,8 +329,8 @@ func (p *Processor) register(data *model.RegisterData) error {
 	}
 	return nil
 }
-func metaDataCompile(val string) (*model.TimerActive, error) {
-	ma := &model.TimerActive{}
+func metaDataCompile(val string) (*model2.TimerActive, error) {
+	ma := &model2.TimerActive{}
 	err := json.Unmarshal([]byte(val), ma)
 	if err != nil {
 		log.Errorf("json unmarshal failed: %s", err)

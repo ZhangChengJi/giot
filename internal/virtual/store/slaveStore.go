@@ -2,7 +2,7 @@ package store
 
 import (
 	"context"
-	"giot/internal/virtual/model"
+	"giot/internal/model"
 	"giot/pkg/log"
 	cmap "github.com/orcaman/concurrent-map"
 	"github.com/shiningrush/droplet/data"
