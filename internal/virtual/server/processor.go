@@ -262,7 +262,7 @@ func (p *Processor) register(data *model.RegisterData) error {
 
 	//2. etcd查询是否有元数据
 	guid := string(data.D)
-	val, err := p.Stg.Get(context.Background(), "transfer/"+guid+"/code")
+	val, err := p.Stg.Get(context.Background(), "device/"+guid+"/code")
 	if err != nil {
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Error)
 		data.C.AsyncWrite(re)

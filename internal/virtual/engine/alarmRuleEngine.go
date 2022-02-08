@@ -9,7 +9,7 @@ import (
 type Interface interface {
 	AlarmRule(unit float64, slave *model2.Slave)
 	Trigger(data float64, slave *model2.Slave)
-	Action(guid, name, productId, alarmId string, data float64, actions []*model2.Action)
+	Action(guid, name, productId, alarmId string, alarmLevel int, data float64, actions []*model2.Action)
 }
 
 type AlarmRuleEngine struct {

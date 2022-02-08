@@ -139,7 +139,7 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 			if len(ta.Ft) > 0 { //etcd 指令存储
 				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 				data, _ := json.Marshal(ta)
-				err := device.Etcd.Create(ctx, "transfer/"+ta.Guid+"/code", string(data))
+				err := device.Etcd.Create(ctx, "device/"+ta.Guid+"/code", string(data))
 				cancel()
 				if err != nil {
 					return err
@@ -149,7 +149,7 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 			if len(savle) > 0 { //etcd 从机+属性
 				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 				data, _ := json.Marshal(savle)
-				err := device.Etcd.Create(ctx, "transfer/"+ta.Guid+"/salve", string(data))
+				err := device.Etcd.Create(ctx, "device/"+ta.Guid+"/salve", string(data))
 				cancel()
 				if err != nil {
 					return err
@@ -158,7 +158,7 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 			if len(alarms) > 0 { //etcd 告警规则
 				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 				data, _ := json.Marshal(alarmList)
-				err := device.Etcd.Create(ctx, "transfer/"+ta.Guid+"/alarm", string(data))
+				err := device.Etcd.Create(ctx, "device/"+ta.Guid+"/alarm", string(data))
 				cancel()
 				if err != nil {
 					return err
