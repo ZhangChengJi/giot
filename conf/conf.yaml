@@ -56,7 +56,8 @@ conf:
     port: 1883
     username: admin
     password: public
-    client_id: gnet_tcp
+    scheduler_client_id: scheduler
+    virtual_client_id: virtual
   tdengine:
     host: 0.0.0.0
     port: 6030

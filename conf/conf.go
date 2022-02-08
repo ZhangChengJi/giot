@@ -93,6 +93,7 @@ type Mqtt struct {
 	Port     int
 	Username string
 	Password string
+	ClientId string
 }
 type Tdengine struct {
 	Host     string

@@ -8,7 +8,7 @@ import (
 )
 
 func (s *server) setupMqtt() error {
-
+	conf.MqttConfig.ClientId = "virtual"
 	if client, err := mqtt.New(conf.MqttConfig); err != nil {
 		log.Errorf("init mqtt client fail: %w", err)
 		return err

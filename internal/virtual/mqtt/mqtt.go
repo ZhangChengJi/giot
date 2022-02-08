@@ -1,6 +1,7 @@
 package mqtt
 
 import (
+	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -31,6 +32,7 @@ func InitMqtt(c mqtt.Client) {
 
 // Publish 发布
 func (b *Broker) Publish(topic string, data interface{}) {
-	token := b.Client.Publish(topic, 0, false, data)
-	token.Wait()
+	if token := b.Client.Publish("device/alarm/296424434E48313836FFD805", 2, false, data); token.Wait() && token.Error() != nil {
+		fmt.Println(token.Error())
+	}
 }
