@@ -4,6 +4,7 @@ import (
 	model2 "giot/internal/model"
 	"giot/internal/virtual/device"
 	"giot/utils/consts"
+	"time"
 )
 
 type Interface interface {
@@ -76,6 +77,7 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
 		}
 		if !b {
 			device.DataChan <- &model2.DeviceMsg{
+				Ts:        time.Now(),
 				Type:      consts.DATA,
 				Status:    true,
 				DeviceId:  slave.DeviceId,
@@ -88,6 +90,7 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
 }
 func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data float64, actions []*model2.Action) {
 	device.DataChan <- &model2.DeviceMsg{
+		Ts:        time.Now(),
 		Type:      consts.DATA,
 		Status:    false,
 		DeviceId:  guid,
@@ -96,6 +99,7 @@ func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, ala
 		Data:      data,
 	}
 	device.AlarmChan <- &model2.DeviceMsg{
+		Ts:         time.Now(),
 		Type:       consts.ALARM,
 		Status:     false,
 		DeviceId:   guid,

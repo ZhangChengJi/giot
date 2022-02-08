@@ -82,7 +82,7 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 				da, _ := strconv.ParseFloat(string(data.Frame), 2)
 
 				if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
-					device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
+					device.DataChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
 					log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
 				} else {
 					al.AlarmRule(da, slave)
@@ -126,7 +126,7 @@ func (p *Processor) deleteTask(action, remoteAddr string) {
 		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
 		p.sl.Delete(context.TODO(), remoteAddr) //从机删除
 		p.al.Delete(context.TODO(), remoteAddr) //告警删除
-		device.OnlineChan <- &model.DeviceMsg{Type: consts.OFFLINE, DeviceId: timer[0].Guid}
+		device.OnlineChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.OFFLINE, DeviceId: timer[0].Guid}
 	case consts.ActionCode:
 		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
 	case consts.ActionSlave:
@@ -332,7 +332,7 @@ func (p *Processor) register(data *model.RegisterData) error {
 			alarmRule := engine.NewAlarmRule(alarms)
 			p.al.Create(context.TODO(), remoteAddr, alarmRule)
 		}
-		device.OnlineChan <- &model.DeviceMsg{Type: consts.ONLINE, DeviceId: de.Guid}
+		device.OnlineChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.ONLINE, DeviceId: de.Guid}
 		log.Infof("register on success,guid:%s remoteAddr:%s", data.D, data.C.RemoteAddr())
 	}
 	return nil
