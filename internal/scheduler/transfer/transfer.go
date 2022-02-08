@@ -53,9 +53,9 @@ func SetupTransfer() {
 }
 
 func (t *Transfer) ListenMqtt() {
-	t.mqtt.Client.Subscribe("transfer/data/#", 0, t.dataHandler)
-	t.mqtt.Client.Subscribe("transfer/alarm/#", 0, t.alarmHandler)
-	t.mqtt.Client.Subscribe("transfer/online/#", 0, t.onlineHandler)
+	t.mqtt.Client.Subscribe("device/data/#", 0, t.dataHandler)
+	t.mqtt.Client.Subscribe("device/alarm/#", 0, t.alarmHandler)
+	t.mqtt.Client.Subscribe("device/online/#", 0, t.onlineHandler)
 }
 func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
 	var device model.DeviceMsg

@@ -40,55 +40,62 @@ func NewProcessor() *Processor {
 }
 
 type ProcessorIn interface {
-	Swift(data <-chan *model.RemoteData, reg chan *model.RegisterData)
-	handle(data *model.RemoteData)
-	ListenCommand(msg <-chan *model.ListenMsg)
+	Swift(reg chan *model.RegisterData)
+	Handle(da chan *model.RemoteData)
+	ListenCommand(msg chan *model.ListenMsg)
 	watchPoolEtcd()
 	activeStore(action, guid, val string) error
 	register(data *model.RegisterData) error
 	deleteTask(action, remoteAddr string)
 }
 
-func (p *Processor) Swift(rdata <-chan *model.RemoteData, reg chan *model.RegisterData) {
+func (p *Processor) Swift(reg chan *model.RegisterData) {
 
 	for {
 		select {
 		case re := <-reg:
 			err := p.register(re)
 			if err != nil {
-				log.Errorf("transfer guid:%s register error  remoteAddr:%s", string(re.D), re.C.RemoteAddr().String())
+				log.Errorf("device guid:%s register error  remoteAddr:%s", string(re.D), re.C.RemoteAddr().String())
 				return
 			}
-		case data := <-rdata:
-			p.handle(data)
 		case <-time.After(200 * time.Millisecond):
 			//等待缓冲
 		}
 	}
 }
 
-func (p *Processor) handle(data *model.RemoteData) {
-	pdu, err := p.modbus.ReadCode(data.Frame) //解码
-	if err != nil {
-		log.Errorf("data Decode failed:%s", data.Frame)
-		return
-	}
-	if slave, err := p.sl.GetSlave(context.TODO(), data.RemoteAddr, pdu.SaveId); err != nil { //获取属性ID
-		log.Errorf("salve:%s not found", pdu.SaveId)
-		return
-	} else {
-		da, _ := strconv.ParseFloat(string(data.Frame), 2)
+func (p *Processor) Handle(da chan *model.RemoteData) {
+	for {
+		select {
+		case data := <-da:
+			fmt.Println("正常数据")
+			pdu, err := p.modbus.ReadCode(data.Frame) //解码
+			if err != nil {
+				log.Errorf("data Decode failed:%s", data.Frame)
+				return
+			}
+			if slave, err := p.sl.GetSlave(context.TODO(), data.RemoteAddr, pdu.SaveId); err != nil { //获取属性ID
+				log.Errorf("salve:%s not found", pdu.SaveId)
+				return
+			} else {
+				da, _ := strconv.ParseFloat(string(data.Frame), 2)
 
-		if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
-			device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
-			log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
-		} else {
-			al.AlarmRule(da, slave)
+				if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
+					device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
+					log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
+				} else {
+					al.AlarmRule(da, slave)
+				}
+
+			}
+		case <-time.After(200 * time.Millisecond):
+			//等待缓冲
 		}
-
 	}
+
 }
-func (p *Processor) ListenCommand(msg <-chan *model.ListenMsg) {
+func (p *Processor) ListenCommand(msg chan *model.ListenMsg) {
 	for {
 		select {
 		case m := <-msg:
@@ -132,7 +139,7 @@ func (p *Processor) deleteTask(action, remoteAddr string) {
 }
 func (p *Processor) watchPoolEtcd() {
 	c, cancel := context.WithCancel(context.TODO())
-	ch := p.Stg.Watch(c, "transfer/")
+	ch := p.Stg.Watch(c, "device/")
 	p.workerPool.Submit(func() {
 		defer runtime.HandlePanic()
 		defer cancel()
@@ -146,8 +153,9 @@ func (p *Processor) watchPoolEtcd() {
 					fmt.Println(event.Events[i].Key)
 					fmt.Println(event.Events[i].Value)
 					//key := event.Events[i].Key[len("transfer/"+guid):]
+					//giot/device/296424434E48313836FFD805/code
 					ret := strings.Split(event.Events[i].Key, "/")
-					p.activeStore(ret[2], ret[1], event.Events[i].Value)
+					p.activeStore(ret[3], ret[2], event.Events[i].Value)
 
 					//key := event.Events[i].Key[len(s.opt.BasePath)+1:]
 					//objPtr, err := s.StringToObjPtr(event.Events[i].Value, key)
@@ -159,7 +167,7 @@ func (p *Processor) watchPoolEtcd() {
 				case etcd.EventTypeDelete:
 					fmt.Println("delete...")
 					ret := strings.Split(event.Events[i].Key, "/")
-					remoteAddr, err := p.gu.Get(context.TODO(), ret[1])
+					remoteAddr, err := p.gu.Get(context.TODO(), ret[2])
 					if err != nil {
 						return
 					}

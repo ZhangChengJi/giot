@@ -52,7 +52,7 @@ func (s *server) Start(er chan error) {
 		er <- err
 		return
 	}
-	go s.setupTcp()
+	s.setupTcp()
 	s.printInfo()
 }
 

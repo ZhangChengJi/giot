@@ -25,7 +25,7 @@ func (ps *TcpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 }
 
 func (ps *TcpServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {
-	fmt.Printf("data:%X\n", c.Read())
+	fmt.Printf("新打开open:%X\n", c.RemoteAddr())
 	log.Printf("Socket with addr: %s has been opened...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Store(c.RemoteAddr().String(), c)
 	return
@@ -44,21 +44,9 @@ func (ps *TcpServer) OnClosed(c gnet.Conn, err error) (action gnet.Action) {
 	return
 }
 
-//func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
-//	log.Println("It's time to push data to clients!!!")
-//	ps.connectedSockets.Range(func(key, value interface{}) bool {
-//		addr := key.(string)
-//		c := value.(gnet.Conn)
-//		c.AsyncWrite([]byte(fmt.Sprintf("heart beating to %s\n", addr)))
-//		return true
-//	})
-//	delay = ps.tick
-//	return
-//}
-
 func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 
-	fmt.Printf("data:%X\n", frame)
+	fmt.Printf("上数data:%X\n", frame)
 
 	length := len(frame)
 	if length > 0 && length >= 7 {
@@ -79,7 +67,7 @@ func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.A
 	//	c.AsyncWrite(data)
 	//})
 	//	return
-	//out = []byte{0x01, 0x71, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01}
+	out = []byte{0x01, 0x71, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01}
 	return
 }
 

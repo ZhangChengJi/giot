@@ -33,13 +33,42 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
 			if trigger.Type == "properties" { //判断是否是属性
 				if trigger.ModelId == slave.AttributeId { //判断是否当前属性ID
 					switch trigger.Operator { //判断比对条件(任意)
-					case consts.EQ, consts.NOT, consts.GT, consts.LT, consts.GTE, consts.LTE: //=
+					case consts.EQ: //=
 						if data == trigger.Val {
 							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
 							b = true
 							break
 						}
-
+					case consts.NOT:
+						if data != trigger.Val {
+							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							b = true
+							break
+						}
+					case consts.GT:
+						if data > trigger.Val {
+							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							b = true
+							break
+						}
+					case consts.LT:
+						if data < trigger.Val {
+							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							b = true
+							break
+						}
+					case consts.GTE:
+						if data >= trigger.Val {
+							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							b = true
+							break
+						}
+					case consts.LTE:
+						if data <= trigger.Val {
+							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							b = true
+							break
+						}
 					}
 
 				}

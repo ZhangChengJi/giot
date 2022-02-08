@@ -30,7 +30,7 @@ type Interface interface {
 
 func (t *SyncTimer) Execute() {
 	for _, v := range t.Directives {
-		fmt.Println("任务下发")
+		fmt.Printf("任务下发:%X\n", v)
 		t.Conn.AsyncWrite(v)
 	}
 }
