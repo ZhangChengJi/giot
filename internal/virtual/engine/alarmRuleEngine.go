@@ -8,9 +8,9 @@ import (
 )
 
 type Interface interface {
-	AlarmRule(unit float64, slave *model2.Slave)
-	Trigger(data float64, slave *model2.Slave)
-	Action(guid, name, productId, alarmId string, alarmLevel int, data float64, actions []*model2.Action)
+	AlarmRule(unit uint64, slave *model2.Slave)
+	Trigger(data uint64, slave *model2.Slave)
+	Action(guid, name, productId, alarmId string, alarmLevel int, data uint64, actions []*model2.Action)
 }
 
 type AlarmRuleEngine struct {
@@ -23,11 +23,11 @@ func NewAlarmRule(alarms []*model2.Alarm) *AlarmRuleEngine {
 	}
 }
 
-func (engine *AlarmRuleEngine) AlarmRule(data float64, slave *model2.Slave) {
+func (engine *AlarmRuleEngine) AlarmRule(data uint64, slave *model2.Slave) {
 	engine.Trigger(data, slave)
 }
 
-func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
+func (engine *AlarmRuleEngine) Trigger(data uint64, slave *model2.Slave) {
 	var b bool
 	for _, alarm := range engine.Alarms { //循环告警规则
 		for _, trigger := range alarm.Triggers { //循环告警触发条件
@@ -88,7 +88,7 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
 		}
 	}
 }
-func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data float64, actions []*model2.Action) {
+func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data uint64, actions []*model2.Action) {
 	device.DataChan <- &model2.DeviceMsg{
 		Ts:        time.Now(),
 		Type:      consts.DATA,

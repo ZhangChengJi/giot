@@ -154,8 +154,6 @@ func (t *Transfer) notifyLoop() {
 					Value:      alarm.Data,
 				}
 				te, _ := json.Marshal(template)
-				//m := "{\"msisdn\": \"18866890232\", \"name\": \"测试\", \"date\": \"20201-20202\"}"
-
 				t.notifyProvider(action.NotifyType, metadata, string(te))
 			}
 		case <-time.After(200 * time.Millisecond):

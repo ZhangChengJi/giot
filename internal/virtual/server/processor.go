@@ -13,11 +13,11 @@ import (
 	"giot/pkg/etcd"
 	"giot/pkg/log"
 	modbus2 "giot/pkg/modbus"
+	"giot/utils"
 	"giot/utils/consts"
 	"giot/utils/runtime"
 	"github.com/RussellLuo/timingwheel"
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -66,11 +66,14 @@ func (p *Processor) Swift(reg chan *model.RegisterData) {
 }
 
 func (p *Processor) Handle(da chan *model.RemoteData) {
+
 	for {
 		select {
 		case data := <-da:
-			fmt.Println("正常数据")
+
 			pdu, err := p.modbus.ReadCode(data.Frame) //解码
+
+			fmt.Printf("正常数据:%v\n", utils.Hex2int(&pdu.Data))
 			if err != nil {
 				log.Errorf("data Decode failed:%s", data.Frame)
 				return
@@ -79,7 +82,7 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 				log.Errorf("salve:%s not found", pdu.SaveId)
 				return
 			} else {
-				da, _ := strconv.ParseFloat(string(data.Frame), 2)
+				da := utils.Hex2int(&pdu.Data)
 
 				if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
 					device.DataChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}

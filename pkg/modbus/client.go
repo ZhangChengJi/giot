@@ -2,6 +2,7 @@ package modbus
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -128,6 +129,17 @@ func (mb *RtuHandler) Verify(aduRequest []byte, aduResponse []byte) (err error) 
 	return
 }
 
+// readHex decodes hexa string to byte, e.g. "8C" => 0x8C.
+func readHex(data []byte) (value byte, err error) {
+	var dst [1]byte
+	if _, err = hex.Decode(dst[:], data[0:2]); err != nil {
+		fmt.Println(err)
+		return
+	}
+	value = dst[0]
+	return
+}
+
 // Decode extracts PDU from RTU frame and verify CRC. Decode 解码
 func (mb *RtuHandler) Decode(adu []byte) (pdu *ProtocolDataUnit, err error) {
 	length := len(adu)
@@ -143,7 +155,9 @@ func (mb *RtuHandler) Decode(adu []byte) (pdu *ProtocolDataUnit, err error) {
 	pdu = &ProtocolDataUnit{}
 	pdu.SaveId = adu[0]
 	pdu.FunctionCode = adu[1]
-	pdu.Data = adu[2 : length-2]
+
+	pdu.Data = adu[3 : len(adu)-2]
+
 	return
 }
 
