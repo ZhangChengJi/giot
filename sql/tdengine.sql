@@ -19,10 +19,10 @@ USE dory_device;
 -- 动态部分是采集数据，第一列为时间戳（ts）,其他列为采集的物理量
 -- 静态部分指采集点的静态属性，一般作为标签。如采集点的地理位置、设备型号、设备组、管理员ID等
 -- 创建正常上数超级表    字段：时间戳、数据、状态。 标签：产品ID、设备ID、属性ID、从机ID、
-CREATE STABLE if not exists device_data  (ts timestamp,gas float, status bool) TAGS(product_id binary(30), device_id binary(30),slave int,model_id binary(30));
+CREATE STABLE if not exists dory_device.device_data  (ts timestamp,gas float, status bool) TAGS(product_id binary(30), device_id binary(30),slave int,model_id binary(30));
 
 --根据超级表创建子表
-CREATE TABLE if not exists  device_data_01 USING device_data TAGS("123","123",1,"123");
+CREATE TABLE if not exists  dory_device.device_data_01 USING dory_device.device_data TAGS("123","123",1,"123");
 
 --插入时候自动创建子表
-INSERT INTO device_data_01 USING device_data  TAGS("123","123",1,"123")VALUES (now,10.2,false);
+INSERT INTO dory_device.device_data_01 USING dory_device.device_data  TAGS("123","123",1,"123")VALUES (now,10.2,false);

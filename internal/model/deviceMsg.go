@@ -27,12 +27,12 @@ const MAX_PARTITIONS = 10
 // TaosEncoder implementations
 
 // If this is setted, sql will use db.table for tablename
-func (r *DeviceMsg) TaosDatabase() string {
+func (r DeviceMsg) TaosDatabase() string {
 	return "dory_device"
 }
 
 // Auto create table using stable and tags
-func (r *DeviceMsg) TaosSTable() string {
+func (r DeviceMsg) TaosSTable() string {
 	switch r.Type {
 	case consts.DATA:
 		return "device_data"
@@ -46,14 +46,14 @@ func (r *DeviceMsg) TaosSTable() string {
 }
 
 // tags must be setted with TaosSTable
-func (r *DeviceMsg) TaosTags() []interface{} {
+func (r DeviceMsg) TaosTags() []interface{} {
 	var tags []interface{}
 	tags = append(tags, r.ProductId, r.DeviceId, r.SlaveId, r.ModelId)
 	return tags
 }
 
 // Dynamic device id as table name
-func (r *DeviceMsg) TaosTable() string {
+func (r DeviceMsg) TaosTable() string {
 	switch r.Type {
 	case consts.DATA:
 		return strings.Join([]string{"device_data", r.DeviceId}, "")
@@ -66,13 +66,13 @@ func (r *DeviceMsg) TaosTable() string {
 }
 
 // Use specific column names as you need
-func (r *DeviceMsg) TaosCols() []string {
+func (r DeviceMsg) TaosCols() []string {
 	var tags []string
 	return tags
 }
 
 // Values
-func (r *DeviceMsg) TaosValues() []interface{} {
+func (r DeviceMsg) TaosValues() []interface{} {
 	var values []interface{}
 	values = append(values, r.Ts)
 	if r.Type == consts.DATA {
