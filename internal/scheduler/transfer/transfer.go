@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"giot/internal/scheduler/logic"
 	"giot/utils"
 	"giot/utils/json"
 	"golang.org/x/text/message"
@@ -54,6 +55,7 @@ func SetupTransfer() {
 func (t *Transfer) ListenMqtt() {
 	t.mqtt.Client.Subscribe("transfer/data/#", 0, t.dataHandler)
 	t.mqtt.Client.Subscribe("transfer/alarm/#", 0, t.alarmHandler)
+	t.mqtt.Client.Subscribe("transfer/online/#", 0, t.onlineHandler)
 }
 func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
 	var device model.DeviceMsg
@@ -76,6 +78,23 @@ func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
 	t.q.Enqueue(device)
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
+}
+
+func (t *Transfer) onlineHandler(client mqtt.Client, msg mqtt.Message) {
+	var device model.DeviceMsg
+	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
+		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
+		return
+	}
+	switch device.Type {
+	case consts.ONLINE:
+		logic.Online(device.DeviceId)
+		log.Warnf("guid:%s online", device.DeviceId)
+	case consts.OFFLINE:
+		logic.Offline(device.DeviceId)
+		log.Warnf("guid:%s offline", device.DeviceId)
+	}
+
 }
 func FromMqttBytes(bytes []byte, device *model.DeviceMsg) error {
 	return json.Unmarshal(bytes, &device)

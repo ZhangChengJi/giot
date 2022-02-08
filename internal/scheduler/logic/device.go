@@ -85,7 +85,7 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 			}
 			//****************告警规则********************
 			var alarms []*model.AlarmRule
-			db.DB.Where(&model.AlarmRule{ProductId: d.ProductId, EnableStatus: DEVICE_ENABLE}).Find(&alarms)
+			db.DB.Raw("select * from alarm_rule where  device_id =? or (product_id =? and device_id is null)", d.Id, d.ProductId).Scan(alarms)
 			var alarmList []*model.Alarm
 			for _, alarm := range alarms {
 				isShake := false

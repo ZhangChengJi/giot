@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	model2 "giot/internal/model"
+	"giot/internal/model"
 	"giot/internal/virtual/device"
 	"giot/internal/virtual/engine"
 	"giot/internal/virtual/store"
@@ -40,16 +40,16 @@ func NewProcessor() *Processor {
 }
 
 type ProcessorIn interface {
-	Swift(data <-chan *model2.RemoteData, reg chan *model2.RegisterData)
-	handle(data *model2.RemoteData)
-	ListenCommand(msg <-chan *model2.ListenMsg)
+	Swift(data <-chan *model.RemoteData, reg chan *model.RegisterData)
+	handle(data *model.RemoteData)
+	ListenCommand(msg <-chan *model.ListenMsg)
 	watchPoolEtcd()
 	activeStore(action, guid, val string) error
-	register(data *model2.RegisterData) error
+	register(data *model.RegisterData) error
 	deleteTask(action, remoteAddr string)
 }
 
-func (p *Processor) Swift(rdata <-chan *model2.RemoteData, reg chan *model2.RegisterData) {
+func (p *Processor) Swift(rdata <-chan *model.RemoteData, reg chan *model.RegisterData) {
 
 	for {
 		select {
@@ -67,7 +67,7 @@ func (p *Processor) Swift(rdata <-chan *model2.RemoteData, reg chan *model2.Regi
 	}
 }
 
-func (p *Processor) handle(data *model2.RemoteData) {
+func (p *Processor) handle(data *model.RemoteData) {
 	pdu, err := p.modbus.ReadCode(data.Frame) //解码
 	if err != nil {
 		log.Errorf("data Decode failed:%s", data.Frame)
@@ -80,7 +80,7 @@ func (p *Processor) handle(data *model2.RemoteData) {
 		da, _ := strconv.ParseFloat(string(data.Frame), 2)
 
 		if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
-			device.DataChan <- &model2.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
+			device.DataChan <- &model.DeviceMsg{Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
 			log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
 		} else {
 			al.AlarmRule(da, slave)
@@ -88,7 +88,7 @@ func (p *Processor) handle(data *model2.RemoteData) {
 
 	}
 }
-func (p *Processor) ListenCommand(msg <-chan *model2.ListenMsg) {
+func (p *Processor) ListenCommand(msg <-chan *model.ListenMsg) {
 	for {
 		select {
 		case m := <-msg:
@@ -96,7 +96,6 @@ func (p *Processor) ListenCommand(msg <-chan *model2.ListenMsg) {
 				p.deleteTask(consts.ActionAll, m.RemoteAddr)
 
 			} else {
-
 			}
 		case <-time.After(300 * time.Millisecond):
 			//等待缓冲
@@ -111,7 +110,7 @@ func (p *Processor) deleteTask(action, remoteAddr string) {
 			return
 		}
 		if len(timer) > 0 {
-			p.gu.Delete(context.TODO(), timer[0].Guid) //guid删除
+			p.gu.Delete(context.TODO(), timer[0].Guid) //远程地址和guid对应关系删除
 		}
 		for _, t := range timer {
 			t.T.Stop()
@@ -120,6 +119,7 @@ func (p *Processor) deleteTask(action, remoteAddr string) {
 		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
 		p.sl.Delete(context.TODO(), remoteAddr) //从机删除
 		p.al.Delete(context.TODO(), remoteAddr) //告警删除
+		device.OnlineChan <- &model.DeviceMsg{Type: consts.OFFLINE, DeviceId: timer[0].Guid}
 	case consts.ActionCode:
 		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
 	case consts.ActionSlave:
@@ -159,14 +159,14 @@ func (p *Processor) watchPoolEtcd() {
 				case etcd.EventTypeDelete:
 					fmt.Println("delete...")
 					ret := strings.Split(event.Events[i].Key, "/")
-					guid, err := p.gu.Get(context.TODO(), ret[1])
+					remoteAddr, err := p.gu.Get(context.TODO(), ret[1])
 					if err != nil {
 						return
 					}
 					if ret[2] == consts.ActionCode {
-						p.deleteTask(consts.ActionAll, guid)
+						p.deleteTask(consts.ActionAll, remoteAddr)
 					} else {
-						p.deleteTask(ret[2], guid)
+						p.deleteTask(ret[2], remoteAddr)
 					}
 				}
 			}
@@ -219,7 +219,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 		}
 
 	case consts.ActionSlave:
-		var slaves []*model2.Slave
+		var slaves []*model.Slave
 		err = json.Unmarshal([]byte(val), &slaves)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -229,7 +229,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 		p.sl.Update(context.TODO(), remoteAddr, slaves)
 
 	case consts.ActionAlarm:
-		var alarms []*model2.Alarm
+		var alarms []*model.Alarm
 		err = json.Unmarshal([]byte(val), &alarms)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -247,7 +247,7 @@ func (p *Processor) activeStore(action, guid, val string) error {
 /**
   注册
 */
-func (p *Processor) register(data *model2.RegisterData) error {
+func (p *Processor) register(data *model.RegisterData) error {
 	//开始
 	//1. 判断是否注册过，如果注册过无需重复注册
 	remoteAddr := data.C.RemoteAddr().String()
@@ -299,7 +299,7 @@ func (p *Processor) register(data *model2.RegisterData) error {
 		p.gu.Create(context.TODO(), guid, remoteAddr)
 		//5. 获取从机信息
 		sa, err := p.Stg.Get(context.Background(), "device/"+guid+"/salve")
-		var slaves []*model2.Slave
+		var slaves []*model.Slave
 		err = json.Unmarshal([]byte(sa), &slaves)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -308,7 +308,7 @@ func (p *Processor) register(data *model2.RegisterData) error {
 
 		//6. 获取告警规则
 		tr, err := p.Stg.Get(context.Background(), "device/"+guid+"/alarm")
-		var alarms []*model2.Alarm
+		var alarms []*model.Alarm
 		err = json.Unmarshal([]byte(tr), &alarms)
 		if err != nil {
 			log.Errorf("json unmarshal failed: %s", err)
@@ -324,13 +324,13 @@ func (p *Processor) register(data *model2.RegisterData) error {
 			alarmRule := engine.NewAlarmRule(alarms)
 			p.al.Create(context.TODO(), remoteAddr, alarmRule)
 		}
-
+		device.OnlineChan <- &model.DeviceMsg{Type: consts.ONLINE, DeviceId: de.Guid}
 		log.Infof("register on success,guid:%s remoteAddr:%s", data.D, data.C.RemoteAddr())
 	}
 	return nil
 }
-func metaDataCompile(val string) (*model2.TimerActive, error) {
-	ma := &model2.TimerActive{}
+func metaDataCompile(val string) (*model.TimerActive, error) {
+	ma := &model.TimerActive{}
 	err := json.Unmarshal([]byte(val), ma)
 	if err != nil {
 		log.Errorf("json unmarshal failed: %s", err)

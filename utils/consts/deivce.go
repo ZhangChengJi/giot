@@ -8,11 +8,13 @@ var (
 )
 
 const (
-	DATA   = "data"
-	ALARM  = "alarm"
-	SMS    = "sms"
-	VOICE  = "voice"
-	WECHAT = "wechat"
+	DATA    = "data"
+	ALARM   = "alarm"
+	SMS     = "sms"
+	VOICE   = "voice"
+	WECHAT  = "wechat"
+	ONLINE  = "online"
+	OFFLINE = "offline"
 
 	EQ  = "eq"  //==
 	NOT = "not" //<>
