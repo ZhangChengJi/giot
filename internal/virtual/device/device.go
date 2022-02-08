@@ -1,7 +1,7 @@
 package device
 
 import (
-	"fmt"
+	"encoding/json"
 	"giot/internal/model"
 	"giot/internal/virtual/mqtt"
 	"time"
@@ -53,22 +53,17 @@ func (d *device) listenLoop() {
 //发布消息
 func (d *device) Insert(data *model.DeviceMsg) {
 	topic := append([]byte("device/data/"), data.DeviceId...)
-	topic = append(topic, ""...)
-	d.Publish(string(topic), data)
-	if token := d.Client.Publish(string(topic), 2, false, data); token.Wait() && token.Error() != nil {
-		fmt.Println(token.Error())
-	}
+	payload, _ := json.Marshal(data)
+	d.Publish(string(topic), payload)
 
 }
 func (d *device) InsertAlarm(data *model.DeviceMsg) {
 	topic := append([]byte("device/alarm/"), data.DeviceId...)
-	if token := d.Client.Publish(string(topic), 2, false, data); token.Wait() && token.Error() != nil {
-		fmt.Println(token.Error())
-	}
+	payload, _ := json.Marshal(data)
+	d.Publish(string(topic), payload)
 }
 func (d *device) Online(data *model.DeviceMsg) {
 	topic := append([]byte("device/online/"), data.DeviceId...)
-	if token := d.Client.Publish(string(topic), 2, false, data); token.Wait() && token.Error() != nil {
-		fmt.Println(token.Error())
-	}
+	payload, _ := json.Marshal(data)
+	d.Publish(string(topic), payload)
 }

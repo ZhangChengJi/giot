@@ -52,7 +52,7 @@ conf:
     multicore: true
     reuseport: true
   mqtt:
-    host: 0.0.0.0
+    host: 192.168.0.109
     port: 1883
     username: admin
     password: public

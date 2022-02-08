@@ -86,7 +86,7 @@ func (r DeviceMsg) TaosValues() []interface{} {
 	if r.Type == consts.DATA {
 		values = append(values, r.Data, r.Status)
 	} else {
-		values = append(values, r.Data, r.Status)
+		values = append(values, r.Data, r.AlarmLevel)
 	}
 
 	return values
