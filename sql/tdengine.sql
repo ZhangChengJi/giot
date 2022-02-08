@@ -26,3 +26,9 @@ CREATE TABLE if not exists  dory_device.device_data_01 USING dory_device.device_
 
 --插入时候自动创建子表
 INSERT INTO dory_device.device_data_01 USING dory_device.device_data  TAGS("123","123",1,"123")VALUES (now,10.2,false);
+
+
+--创建告警表  字段：时间戳、数据、告警级别  标签 产品ID、设备ID、属性ID、从机ID、告警ID
+CREATE STABLE if not exists dory_device.device_alarm  (ts timestamp,gas float, alarm_level int) TAGS(product_id binary(30), device_id binary(30),slave int,model_id binary(30),alarm_id binary(30));
+--创建通知表
+CREATE STABLE if not exists dory_device.device_notify  (ts timestamp,notify_type binary(10),phone_Number binary(30)) TAGS(product_id binary(30), device_id binary(30),alarm_id binary(30),template_id binary(30));

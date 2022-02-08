@@ -6,17 +6,10 @@ import (
 	"giot/utils/consts"
 )
 
-var EnChan = make(chan model2.RemoteData, 1024)
-
-//func loop() {
-//
-//	data := <-EnChan
-//}
-
 type Interface interface {
 	AlarmRule(unit float64, slave *model2.Slave)
 	Trigger(data float64, slave *model2.Slave)
-	Action(guid, name, productId string, data float64, actions []*model2.Action)
+	Action(guid, name, productId, alarmId string, data float64, actions []*model2.Action)
 }
 
 type AlarmRuleEngine struct {
@@ -42,7 +35,7 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
 					switch trigger.Operator { //判断比对条件(任意)
 					case consts.EQ, consts.NOT, consts.GT, consts.LT, consts.GTE, consts.LTE: //=
 						if data == trigger.Val {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, data, alarm.Actions)
+							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
 							b = true
 							break
 						}
@@ -64,7 +57,7 @@ func (engine *AlarmRuleEngine) Trigger(data float64, slave *model2.Slave) {
 		}
 	}
 }
-func (engine *AlarmRuleEngine) Action(guid, name, productId string, data float64, actions []*model2.Action) {
+func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data float64, actions []*model2.Action) {
 	device.DataChan <- &model2.DeviceMsg{
 		Type:      consts.DATA,
 		Status:    false,
@@ -74,12 +67,14 @@ func (engine *AlarmRuleEngine) Action(guid, name, productId string, data float64
 		Data:      data,
 	}
 	device.AlarmChan <- &model2.DeviceMsg{
-		Type:      consts.ALARM,
-		Status:    false,
-		DeviceId:  guid,
-		Name:      name,
-		ProductId: productId,
-		Data:      data,
-		Actions:   actions,
+		Type:       consts.ALARM,
+		Status:     false,
+		DeviceId:   guid,
+		Name:       name,
+		ProductId:  productId,
+		AlarmId:    alarmId,
+		AlarmLevel: alarmLevel,
+		Data:       data,
+		Actions:    actions,
 	}
 }

@@ -9,16 +9,20 @@ import (
 )
 
 type DeviceMsg struct {
-	Ts        time.Time `json:"timestamp"`
-	Type      string    `json:"type"`
-	Status    bool      `json:"status"`
-	DeviceId  string    `json:"deviceId"`
-	Name      string    `json:"name" `
-	SlaveId   int       `json:"slaveId"`
-	ProductId string    `json:"productId"`
-	ModelId   string    `json:"modelId"`
-	Data      float64   `json:"data"`
-	Actions   []*Action
+	Ts         time.Time `json:"timestamp"`
+	Type       string    `json:"type"`
+	Status     bool      `json:"status"`
+	DeviceId   string    `json:"deviceId"`
+	Name       string    `json:"name" `
+	SlaveId    int       `json:"slaveId"`
+	ProductId  string    `json:"productId"`
+	ModelId    string    `json:"modelId"`
+	AlarmId    string    `json:"alarmId"`
+	AlarmLevel int       `json:"alarmLevel"`
+	Data       float64   `json:"data"`
+	NotifyType string    `json:"notifyType"` //通知类型
+	TemplateId string    `json:"templateId"` //通知模版ID
+	Actions    []*Action
 }
 
 // Change max partitions as you need.
@@ -48,7 +52,11 @@ func (r DeviceMsg) TaosSTable() string {
 // tags must be setted with TaosSTable
 func (r DeviceMsg) TaosTags() []interface{} {
 	var tags []interface{}
-	tags = append(tags, r.ProductId, r.DeviceId, r.SlaveId, r.ModelId)
+	if r.Type == consts.DATA {
+		tags = append(tags, r.ProductId, r.DeviceId, r.SlaveId, r.ModelId)
+	} else {
+		tags = append(tags, r.ProductId, r.DeviceId, r.SlaveId, r.ModelId, r.AlarmId)
+	}
 	return tags
 }
 

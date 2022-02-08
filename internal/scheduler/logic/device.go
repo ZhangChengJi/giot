@@ -123,6 +123,7 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 				//*****************END******************
 
 				var t = &model.Alarm{
+					AlarmId:    alarm.Id,
 					ProductId:  d.ProductId,
 					DeviceId:   d.Id,
 					DeviceName: d.Name,

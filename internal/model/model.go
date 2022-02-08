@@ -204,6 +204,8 @@ type Slave struct {
 	AttributeId string `json:"attributeId"`
 }
 type Alarm struct {
+	AlarmId     string      `json:"alarmId"` //告警ID
+	AlarmLevel  int         `json:"alarmLevel"`
 	Name        string      `json:"name"`        //告警名称
 	ProductId   string      `json:"productId"`   //产品ID
 	ProductName string      `json:"productName"` //产品名称
