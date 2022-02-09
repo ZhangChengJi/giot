@@ -10,7 +10,7 @@ import (
 type Interface interface {
 	AlarmRule(unit uint16, slave *model2.Slave)
 	Trigger(data uint16, slave *model2.Slave)
-	Action(guid, name, productId, alarmId string, alarmLevel int, data uint16, actions []*model2.Action)
+	Action(guid, name, productId, alarmId string, alarmLevel int, data uint16, slaveId byte, actions []*model2.Action)
 }
 
 type AlarmRuleEngine struct {
@@ -33,6 +33,7 @@ func (engine *AlarmRuleEngine) Trigger(data uint16, slave *model2.Slave) {
 		Type:      consts.DATA,
 		Status:    true,
 		DeviceId:  slave.DeviceId,
+		SlaveId:   int(slave.SlaveId),
 		Name:      slave.SlaveName,
 		ProductId: slave.ProductId,
 		Data:      data,
@@ -45,32 +46,32 @@ func (engine *AlarmRuleEngine) Trigger(data uint16, slave *model2.Slave) {
 					switch trigger.Operator { //判断比对条件(任意) 触发条件满足条件中任意一个即可触发
 					case consts.EQ: //=
 						if data == trigger.Val {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							engine.Action(slave.DeviceId, alarm.DeviceName, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, slave.SlaveId, alarm.Actions)
 							break loop
 						}
 					case consts.NOT:
 						if data != trigger.Val {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							engine.Action(slave.DeviceId, alarm.DeviceName, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, slave.SlaveId, alarm.Actions)
 							break loop
 						}
 					case consts.GT:
 						if data > trigger.Val {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							engine.Action(slave.DeviceId, alarm.DeviceName, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, slave.SlaveId, alarm.Actions)
 							break loop
 						}
 					case consts.LT:
 						if data < trigger.Val {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							engine.Action(slave.DeviceId, alarm.DeviceName, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, slave.SlaveId, alarm.Actions)
 							break loop
 						}
 					case consts.GTE:
 						if data >= trigger.Val {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							engine.Action(slave.DeviceId, alarm.DeviceName, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, slave.SlaveId, alarm.Actions)
 							break loop
 						}
 					case consts.LTE:
 						if data <= trigger.Val {
-							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
+							engine.Action(slave.DeviceId, alarm.DeviceName, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, slave.SlaveId, alarm.Actions)
 							break loop
 						}
 					}
@@ -79,12 +80,13 @@ func (engine *AlarmRuleEngine) Trigger(data uint16, slave *model2.Slave) {
 		}
 	}
 }
-func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data uint16, actions []*model2.Action) {
+func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data uint16, slaveId byte, actions []*model2.Action) {
 	device.AlarmChan <- &model2.DeviceMsg{
 		Ts:         time.Now(),
 		Type:       consts.ALARM,
 		Status:     false,
 		DeviceId:   guid,
+		SlaveId:    int(slaveId),
 		Name:       name,
 		ProductId:  productId,
 		AlarmId:    alarmId,

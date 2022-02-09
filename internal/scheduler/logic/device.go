@@ -126,6 +126,7 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 				var t = &model.Alarm{
 					AlarmId:    alarm.Id,
 					ProductId:  d.ProductId,
+					AlarmLevel: alarm.AlarmLevel,
 					DeviceId:   d.Id,
 					DeviceName: d.Name,
 					ShakeLimit: &model.ShakeLimit{Enabled: isShake, Time: alarm.Within, Threshold: alarm.Num, AlarmFirst: isFirst},
