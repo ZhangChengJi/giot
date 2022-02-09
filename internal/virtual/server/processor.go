@@ -18,6 +18,7 @@ import (
 	"giot/utils/runtime"
 	"github.com/RussellLuo/timingwheel"
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
+	log4j "log"
 	"strings"
 	"time"
 )
@@ -263,6 +264,7 @@ func (p *Processor) register(data *model.RegisterData) error {
 			re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Success)
 			data.C.AsyncWrite(re)
 			log.Warnf("remoteAddr:%s alike no need to register again", remoteAddr)
+
 			return err
 		}
 	}
@@ -273,7 +275,8 @@ func (p *Processor) register(data *model.RegisterData) error {
 	if err != nil {
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Error)
 		data.C.AsyncWrite(re)
-		log.Warnf("guid:%v transfer metadata not found.", guid)
+		log.Warnf("guid:%v metadata not found.", guid)
+		log4j.Printf("guid:%v remoteAddr:%v注册失败，无法查询到元数据", guid, remoteAddr)
 		return err
 	}
 	//3. 认证成功开始配置元数据信息
@@ -333,6 +336,8 @@ func (p *Processor) register(data *model.RegisterData) error {
 		}
 		device.OnlineChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.ONLINE, DeviceId: de.Guid}
 		log.Infof("register on success,guid:%s remoteAddr:%s", data.D, data.C.RemoteAddr())
+		log4j.Printf("guid:%v remoteAddr:%v注册成功🧸", guid, remoteAddr)
+
 	}
 	return nil
 }
