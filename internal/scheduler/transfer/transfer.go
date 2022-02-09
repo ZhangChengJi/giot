@@ -9,6 +9,7 @@ import (
 	"giot/utils/json"
 	"golang.org/x/text/message"
 	"runtime"
+	"strconv"
 
 	"giot/internal/model"
 	"giot/internal/notify"
@@ -130,7 +131,7 @@ func (t *Transfer) notifyProvider(action string, metadata *notify.Metadata) {
 
 	switch action {
 	case consts.SMS:
-		sms := sms.New(metadata.AccessKeyId, metadata.AccessSecret)
+		sms := sms.New(metadata.AccessKeyId, metadata.Secret)
 		sms.AddReceivers(metadata.Sms.PhoneNumber)
 		t.notifier.UseServices(sms)
 		t.notifier.Send(context.Background(), metadata.Sms.SignName, metadata.Sms.Code, metadata.Sms.Param) //TODO 是否记录发送状态
@@ -174,7 +175,7 @@ func (t *Transfer) queryNotifyMetadata(cid, tid, notifyType, name string, slaveI
 	}
 	switch notifyType {
 	case consts.SMS:
-		pa := &sms.Template{Devname: name, Devid: string(slaveId), Alarmtype: model.Level(level)}
+		pa := &sms.Template{Devname: name, Devid: strconv.Itoa(slaveId), Alarmtype: model.Level(level)}
 		param, _ := json.Marshal(pa)
 		err = json.Unmarshal([]byte(template.Template), &metadata.Sms)
 		if err != nil {

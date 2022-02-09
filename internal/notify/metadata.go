@@ -1,10 +1,10 @@
 package notify
 
 type Metadata struct {
-	AccessKeyId  string `json:"accessKeyId"`
-	AccessSecret string `json:"accessSecret"`
-	Sms          *SmsMetadata
-	Voice        *VoiceMetadata
+	AccessKeyId string `json:"accessKeyId"`
+	Secret      string `json:"secret"`
+	Sms         *SmsMetadata
+	Voice       *VoiceMetadata
 }
 type SmsMetadata struct {
 	SignName    string `json:"signName"`
