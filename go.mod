@@ -13,6 +13,11 @@ require (
 	github.com/RussellLuo/timingwheel v0.0.0-20201029015908-64de9d088c74
 	github.com/agrison/go-tablib v0.0.0-20160310143025-4930582c22ee // indirect
 	github.com/agrison/mxj v0.0.0-20160310142625-1269f8afb3b4 // indirect
+	github.com/alibabacloud-go/darabonba-openapi v0.1.14
+	github.com/alibabacloud-go/dysmsapi-20170525/v2 v2.0.9
+	github.com/alibabacloud-go/tea v1.1.17
+	github.com/alibabacloud-go/tea-console v1.0.0
+	github.com/alibabacloud-go/tea-utils v1.4.3
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1458
 	github.com/bndr/gotabulate v1.1.2 // indirect
 	github.com/clbanning/mxj v1.8.4 // indirect
@@ -32,7 +37,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lithammer/dedent v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.10 // indirect
-	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/orcaman/concurrent-map v1.0.0
 	github.com/panjf2000/gnet v1.6.4
 	github.com/pkg/errors v0.8.1
@@ -55,7 +59,6 @@ require (
 	go.uber.org/zap v1.20.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/text v0.3.7
-	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/flosch/pongo2.v3 v3.0.0-20141028000813-5e81b817a0c4 // indirect
 	gorm.io/driver/mysql v1.2.3
 	gorm.io/gorm v1.22.4

@@ -46,6 +46,14 @@ const (
 	rtuExceptionSize = 5
 )
 
+type Endianness uint
+
+const (
+	// endianness of 16-bit registers
+	BIG_ENDIAN    Endianness = 1
+	LITTLE_ENDIAN Endianness = 2
+)
+
 var (
 	Success = []byte{0x0, 0x1}
 	Error   = []byte{0x0, 0x0}

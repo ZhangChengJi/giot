@@ -8,9 +8,9 @@ import (
 )
 
 type Interface interface {
-	AlarmRule(unit uint64, slave *model2.Slave)
-	Trigger(data uint64, slave *model2.Slave)
-	Action(guid, name, productId, alarmId string, alarmLevel int, data uint64, actions []*model2.Action)
+	AlarmRule(unit uint16, slave *model2.Slave)
+	Trigger(data uint16, slave *model2.Slave)
+	Action(guid, name, productId, alarmId string, alarmLevel int, data uint16, actions []*model2.Action)
 }
 
 type AlarmRuleEngine struct {
@@ -23,81 +23,63 @@ func NewAlarmRule(alarms []*model2.Alarm) *AlarmRuleEngine {
 	}
 }
 
-func (engine *AlarmRuleEngine) AlarmRule(data uint64, slave *model2.Slave) {
+func (engine *AlarmRuleEngine) AlarmRule(data uint16, slave *model2.Slave) {
 	engine.Trigger(data, slave)
 }
 
-func (engine *AlarmRuleEngine) Trigger(data uint64, slave *model2.Slave) {
-	var b bool
+func (engine *AlarmRuleEngine) Trigger(data uint16, slave *model2.Slave) {
+	device.DataChan <- &model2.DeviceMsg{
+		Ts:        time.Now(),
+		Type:      consts.DATA,
+		Status:    true,
+		DeviceId:  slave.DeviceId,
+		Name:      slave.SlaveName,
+		ProductId: slave.ProductId,
+		Data:      data,
+	}
 	for _, alarm := range engine.Alarms { //循环告警规则
+	loop:
 		for _, trigger := range alarm.Triggers { //循环告警触发条件
 			if trigger.Type == "properties" { //判断是否是属性
 				if trigger.ModelId == slave.AttributeId { //判断是否当前属性ID
-					switch trigger.Operator { //判断比对条件(任意)
+					switch trigger.Operator { //判断比对条件(任意) 触发条件满足条件中任意一个即可触发
 					case consts.EQ: //=
 						if data == trigger.Val {
 							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
-							b = true
-							break
+							break loop
 						}
 					case consts.NOT:
 						if data != trigger.Val {
 							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
-							b = true
-							break
+							break loop
 						}
 					case consts.GT:
 						if data > trigger.Val {
 							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
-							b = true
-							break
+							break loop
 						}
 					case consts.LT:
 						if data < trigger.Val {
 							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
-							b = true
-							break
+							break loop
 						}
 					case consts.GTE:
 						if data >= trigger.Val {
 							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
-							b = true
-							break
+							break loop
 						}
 					case consts.LTE:
 						if data <= trigger.Val {
 							engine.Action(slave.DeviceId, alarm.Name, alarm.ProductId, alarm.AlarmId, alarm.AlarmLevel, data, alarm.Actions)
-							b = true
-							break
+							break loop
 						}
 					}
-
 				}
-			}
-		}
-		if !b {
-			device.DataChan <- &model2.DeviceMsg{
-				Ts:        time.Now(),
-				Type:      consts.DATA,
-				Status:    true,
-				DeviceId:  slave.DeviceId,
-				Name:      slave.SlaveName,
-				ProductId: slave.ProductId,
-				Data:      data,
 			}
 		}
 	}
 }
-func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data uint64, actions []*model2.Action) {
-	device.DataChan <- &model2.DeviceMsg{
-		Ts:        time.Now(),
-		Type:      consts.DATA,
-		Status:    false,
-		DeviceId:  guid,
-		Name:      name,
-		ProductId: productId,
-		Data:      data,
-	}
+func (engine *AlarmRuleEngine) Action(guid, name, productId, alarmId string, alarmLevel int, data uint16, actions []*model2.Action) {
 	device.AlarmChan <- &model2.DeviceMsg{
 		Ts:         time.Now(),
 		Type:       consts.ALARM,

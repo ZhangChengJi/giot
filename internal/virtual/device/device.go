@@ -2,6 +2,7 @@ package device
 
 import (
 	"encoding/json"
+	"fmt"
 	"giot/internal/model"
 	"giot/internal/virtual/mqtt"
 	"time"
@@ -22,17 +23,17 @@ type Interface interface {
 	Insert(data *model.DeviceMsg)
 	InsertAlarm(data *model.DeviceMsg)
 	Online(data *model.DeviceMsg)
-	//sendNotify(data *model.DeviceMsg)
 }
 
 func Init() {
 	DataChan = make(chan *model.DeviceMsg)
 	AlarmChan = make(chan *model.DeviceMsg)
+	OnlineChan = make(chan *model.DeviceMsg)
 	d := &device{mqtt.Broker{Client: mqtt.Client}}
 
-	//for i := 0; i <2 ; i++ {
-	go d.listenLoop()
-	//}
+	for i := 0; i < 2; i++ {
+		go d.listenLoop()
+	}
 
 }
 
@@ -41,11 +42,14 @@ func (d *device) listenLoop() {
 		select {
 		case data := <-DataChan:
 			d.Insert(data)
+			fmt.Println("我是正常数据", data.Data)
 		case data := <-AlarmChan:
 			d.InsertAlarm(data)
+			fmt.Println("我是报警数据", data.Data)
 		case data := <-OnlineChan:
 			d.Online(data)
-		case <-time.After(200 * time.Millisecond):
+			fmt.Println("我是上下线数据", data.Type)
+		case <-time.After(300 * time.Millisecond):
 		}
 	}
 }

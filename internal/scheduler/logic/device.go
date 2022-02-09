@@ -103,12 +103,12 @@ func (device *DeviceSvc) InitEtcdDataLoad() error {
 				db.DB.Where(&model.Condition{AlarmRuleId: alarm.Id}).Find(&condition)
 				var triggers []*model.Trigger
 				for _, c := range condition {
-					da, _ := strconv.ParseFloat(string(c.Values), 2)
+					da, _ := strconv.ParseUint(c.Values, 0, 16)
 					trigger := &model.Trigger{
 						Type:     c.ConditionType,
 						ModelId:  c.AttributeId,
 						Operator: c.SymbolType,
-						Val:      da,
+						Val:      uint16(da),
 					}
 					triggers = append(triggers, trigger)
 				}

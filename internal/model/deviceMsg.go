@@ -19,7 +19,7 @@ type DeviceMsg struct {
 	ModelId    string    `json:"modelId"`
 	AlarmId    string    `json:"alarmId"`
 	AlarmLevel int       `json:"alarmLevel"`
-	Data       uint64    `json:"data"`
+	Data       uint16    `json:"data"`
 	NotifyType string    `json:"notifyType"` //通知类型
 	TemplateId string    `json:"templateId"` //通知模版ID
 	Actions    []*Action

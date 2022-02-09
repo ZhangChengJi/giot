@@ -3,6 +3,7 @@ package server
 import "C"
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"giot/internal/model"
@@ -13,7 +14,6 @@ import (
 	"giot/pkg/etcd"
 	"giot/pkg/log"
 	modbus2 "giot/pkg/modbus"
-	"giot/utils"
 	"giot/utils/consts"
 	"giot/utils/runtime"
 	"github.com/RussellLuo/timingwheel"
@@ -70,10 +70,7 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 	for {
 		select {
 		case data := <-da:
-
 			pdu, err := p.modbus.ReadCode(data.Frame) //解码
-
-			fmt.Printf("正常数据:%v\n", utils.Hex2int(&pdu.Data))
 			if err != nil {
 				log.Errorf("data Decode failed:%s", data.Frame)
 				return
@@ -82,8 +79,7 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 				log.Errorf("salve:%s not found", pdu.SaveId)
 				return
 			} else {
-				da := utils.Hex2int(&pdu.Data)
-
+				da := binary.BigEndian.Uint16(pdu.Data)
 				if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
 					device.DataChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
 					log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)

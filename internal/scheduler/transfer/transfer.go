@@ -126,14 +126,14 @@ func (t *Transfer) consume(workers int) {
 	}
 }
 
-func (t *Transfer) notifyProvider(action string, metadata *notify.Metadata, template string) {
+func (t *Transfer) notifyProvider(action string, metadata *notify.Metadata) {
 
 	switch action {
 	case consts.SMS:
-		sms := sms.New(metadata.RegionId, metadata.AccessKeyId, metadata.AccessSecret)
-		sms.AddReceivers(metadata.PhoneNumbers)
+		sms := sms.New(metadata.AccessKeyId, metadata.AccessSecret)
+		sms.AddReceivers(metadata.Sms.PhoneNumber)
 		t.notifier.UseServices(sms)
-		t.notifier.Send(context.Background(), metadata.SignName, metadata.TemplateCode, template) //TODO 是否记录发送状态
+		t.notifier.Send(context.Background(), metadata.Sms.SignName, metadata.Sms.Code, metadata.Sms.Param) //TODO 是否记录发送状态
 	case consts.VOICE:
 
 	}
@@ -143,26 +143,20 @@ func (t *Transfer) notifyLoop() {
 		select {
 		case alarm := <-t.alarmChan:
 			for _, action := range alarm.Actions {
-				metadata, err := t.queryNotifyData(action.NotifierId, action.TemplateId)
+				metadata, err := t.queryNotifyMetadata(action.NotifierId, action.TemplateId, action.NotifyType, alarm.Name, alarm.SlaveId, alarm.AlarmLevel)
 				if err != nil {
 					log.Errorf("query notify metadata failed")
 					return
 				}
-				template := &notify.Template{
-					DeviceName: alarm.Name,
-					SlaveId:    alarm.SlaveId,
-					Value:      alarm.Data,
-				}
-				te, _ := json.Marshal(template)
-				t.notifyProvider(action.NotifyType, metadata, string(te))
+				t.notifyProvider(action.NotifyType, metadata)
 			}
-		case <-time.After(200 * time.Millisecond):
+		case <-time.After(300 * time.Millisecond):
 
 		}
 	}
 }
 
-func (t *Transfer) queryNotifyData(cid, tid string) (*notify.Metadata, error) {
+func (t *Transfer) queryNotifyMetadata(cid, tid, notifyType, name string, slaveId int, level int) (*notify.Metadata, error) {
 	var config model.NotifyConfig
 	err := t.db.First(&config, cid).Error
 	if err != nil {
@@ -178,9 +172,23 @@ func (t *Transfer) queryNotifyData(cid, tid string) (*notify.Metadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal([]byte(template.Template), &metadata)
-	if err != nil {
-		return nil, err
+	switch notifyType {
+	case consts.SMS:
+		pa := &sms.Template{Devname: name, Devid: string(slaveId), Alarmtype: model.Level(level)}
+		param, _ := json.Marshal(pa)
+		err = json.Unmarshal([]byte(template.Template), &metadata.Sms)
+		if err != nil {
+			return nil, err
+		}
+		metadata.Sms.Param = string(param)
+		break
+	case consts.VOICE:
+		err = json.Unmarshal([]byte(template.Template), &metadata.Voice)
+		if err != nil {
+			return nil, err
+		}
+		break
 	}
+
 	return &metadata, nil
 }
