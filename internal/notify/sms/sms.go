@@ -59,9 +59,9 @@ func (s *sms) Send(ctx context.Context, signName, templateCode, param string) (e
 		resp, err := s.client.SendSms(sendSmsRequest)
 		if err != nil {
 			err = errors.Wrap(err, "failed to send sms")
+			log.Errorf("send cms failed:%v", resp.Body)
+			fmt.Printf("send cms failed:%v\n", resp.Body)
 		}
-		log.Errorf("send cms failed:%v", resp.Body)
-		fmt.Printf("response is %v\n", resp.Body)
 
 	}
 	return err
