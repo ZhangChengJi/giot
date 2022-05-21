@@ -2,6 +2,7 @@ package tdengine
 
 import (
 	"database/sql"
+	"fmt"
 	"giot/conf"
 	"giot/pkg/log"
 	_ "github.com/taosdata/driver-go/v2/taosSql"
@@ -17,6 +18,7 @@ func New(conf *conf.Tdengine) (*sql.DB, error) {
 		log.Fatalf("Open database error: %s\n", err)
 	}
 	err = db.Ping()
+	fmt.Println("🪅Tdengine Connection Successful........")
 	if err != nil {
 		panic("tdengine conn failed")
 		return nil, err

@@ -39,10 +39,10 @@ conf:
       - 127.0.0.1:2379
     prefix: giot
   mysql:
-    host: 192.168.0.42
+    host: 192.168.0.72
     port: 3306
     username: root
-    password: Dory2019@
+    password: dory@2022
     database: pig
     max_idle_conns: 5 # 最大空闲的连接数
     Max_open_conns: 30
@@ -52,14 +52,14 @@ conf:
     multicore: true
     reuseport: true
   mqtt:
-    host: 192.168.0.109
+    host: 192.168.0.73
     port: 1883
     username: admin
     password: public
     scheduler_client_id: scheduler
     virtual_client_id: virtual
   tdengine:
-    host: 0.0.0.0
+    host: h1.taosdata.com
     port: 6030
     username: root
     password: taosdata

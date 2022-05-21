@@ -16,8 +16,6 @@ require (
 	github.com/alibabacloud-go/darabonba-openapi v0.1.14
 	github.com/alibabacloud-go/dysmsapi-20170525/v2 v2.0.9
 	github.com/alibabacloud-go/tea v1.1.17
-	github.com/alibabacloud-go/tea-console v1.0.0
-	github.com/alibabacloud-go/tea-utils v1.4.3
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1458
 	github.com/bndr/gotabulate v1.1.2 // indirect
 	github.com/clbanning/mxj v1.8.4 // indirect
@@ -29,6 +27,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/fatih/structs v1.1.0 // indirect
+	github.com/go-mysql-org/go-mysql v1.4.0
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
@@ -39,14 +38,15 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.10 // indirect
 	github.com/orcaman/concurrent-map v1.0.0
 	github.com/panjf2000/gnet v1.6.4
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/shiningrush/droplet v0.3.0
+	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.0 // indirect
-	github.com/taosdata/driver-go/v2 v2.0.0
+	github.com/taosdata/driver-go/v2 v2.0.1 // indirect
 	github.com/tealeg/xlsx v1.0.5 // indirect
 	github.com/tidwall/gjson v1.12.1
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
