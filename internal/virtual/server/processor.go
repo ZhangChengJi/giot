@@ -1,14 +1,12 @@
 package server
 
-import "C"
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"giot/internal/model"
 	"giot/internal/virtual/device"
-	"giot/internal/virtual/engine"
+	"giot/internal/virtual/lineTimer"
 	"giot/internal/virtual/store"
 	"giot/internal/virtual/wheelTimer"
 	"giot/pkg/etcd"
@@ -24,20 +22,22 @@ import (
 )
 
 type Processor struct {
-	modbus     modbus2.Client
-	Stg        etcd.Interface
-	Tw         *timingwheel.TimingWheel
-	Dt         store.DeviceTimerIn
-	al         store.AlarmStoreIn
-	gu         store.GuidStoreIn
-	sl         store.SlaveStoreIn
-	workerPool *goroutine.Pool
+	modbus      modbus2.Client
+	Stg         etcd.Interface
+	Timer       *timingwheel.TimingWheel
+	TimerStore  store.DeviceTimerIn
+	LineStore   lineTimer.LineStoreIn
+	guidStore   store.GuidStoreIn
+	slaveStore  store.SlaveStoreIn
+	deviceStore store.DeviceStoreIn
+	workerPool  *goroutine.Pool
 }
 
 func NewProcessor() *Processor {
-	processor := &Processor{modbus: modbus2.NewClient(&modbus2.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Tw: wheelTimer.NewTimer(), Dt: store.NewTimerStore(), al: store.NewAlarmStore(), gu: store.NewGuidStore(), sl: store.NewSlaveStore(), workerPool: goroutine.Default()}
+	processor := &Processor{modbus: modbus2.NewClient(&modbus2.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Timer: wheelTimer.NewTimer(), TimerStore: store.NewTimerStore(), LineStore: lineTimer.NewLineStore(), guidStore: store.NewGuidStore(), slaveStore: store.NewSlaveStore(), deviceStore: store.NewDeviceStore(), workerPool: goroutine.Default()}
 	go processor.watchPoolEtcd()
 	return processor
+
 }
 
 type ProcessorIn interface {
@@ -45,9 +45,10 @@ type ProcessorIn interface {
 	Handle(da chan *model.RemoteData)
 	ListenCommand(msg chan *model.ListenMsg)
 	watchPoolEtcd()
-	activeStore(action, guid, val string) error
+	activeStore(guid, val string) error
 	register(data *model.RegisterData) error
-	deleteTask(action, remoteAddr string)
+	deleteTask(remoteAddr string)
+	checkLine(guid, remoteAddr string, duration time.Duration)
 }
 
 func (p *Processor) Swift(reg chan *model.RegisterData) {
@@ -55,11 +56,8 @@ func (p *Processor) Swift(reg chan *model.RegisterData) {
 	for {
 		select {
 		case re := <-reg:
-			err := p.register(re)
-			if err != nil {
-				log.Errorf("device guid:%s register error  remoteAddr:%s", string(re.D), re.C.RemoteAddr().String())
-				return
-			}
+			p.register(re)
+
 		case <-time.After(200 * time.Millisecond):
 			//等待缓冲
 		}
@@ -71,23 +69,27 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 	for {
 		select {
 		case data := <-da:
-			pdu, err := p.modbus.ReadCode(data.Frame) //解码
-			if err != nil {
-				log.Errorf("data Decode failed:%s", data.Frame)
-				return
-			}
-			if slave, err := p.sl.GetSlave(context.TODO(), data.RemoteAddr, pdu.SaveId); err != nil { //获取属性ID
-				log.Errorf("salve:%s not found", pdu.SaveId)
-				return
-			} else {
-				da := binary.BigEndian.Uint16(pdu.Data)
-				if al, err := p.al.Get(context.TODO(), data.RemoteAddr); err != nil {
-					device.DataChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.DATA, DeviceId: slave.DeviceId, ProductId: slave.ProductId, Name: slave.DeviceName, Status: true, Data: da, ModelId: slave.AttributeId, SlaveId: int(slave.SlaveId)}
-					log.Warnf("remoteAddr:%s not alarm rule", data.RemoteAddr)
+			info, err := p.deviceStore.Get(context.TODO(), data.RemoteAddr)
+			if err == nil && info != nil {
+				var pdu *modbus2.ProtocolDataUnit
+				if info.IsType() {
+					pdu, err = p.modbus.ReadIndustryCode(data.Frame) //解码
 				} else {
-					al.AlarmRule(da, slave)
+					pdu, err = p.modbus.ReadHomeCode(data.Frame) //解码
 				}
-
+				if err == nil {
+					if slave, err := p.slaveStore.GetSlave(context.TODO(), data.RemoteAddr, pdu.SaveId); err == nil { //获取属性ID
+						slave.DataTime = time.Now()
+						if slave.LineStatus == "" || slave.LineStatus == consts.OFFLINE {
+							fmt.Printf("时间:%v----->slave:%v上⬆️线\n", time.Now().Format("2006-01-02 15:04:05"), slave.SlaveId)
+							slave.LineStatus = consts.ONLINE
+							device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: info.GuId, SlaveId: int(slave.SlaveId)}
+						}
+						slave.Alarm.AlarmRule(slave.SlaveId, ByteToFloat32(pdu.Data), pdu.FunctionCode, info)
+					} else {
+						log.Errorf("salve:%s not found", pdu.SaveId)
+					}
+				}
 			}
 		case <-time.After(200 * time.Millisecond):
 			//等待缓冲
@@ -95,12 +97,17 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 	}
 
 }
+
+func ByteToFloat32(bytes []byte) float32 {
+	b2 := bytes[1]
+	return float32(b2)
+}
 func (p *Processor) ListenCommand(msg chan *model.ListenMsg) {
 	for {
 		select {
 		case m := <-msg:
 			if m.ListenType == 1 { //1代表tcp 任务
-				p.deleteTask(consts.ActionAll, m.RemoteAddr)
+				p.deleteTask(m.RemoteAddr)
 
 			} else {
 			}
@@ -109,32 +116,28 @@ func (p *Processor) ListenCommand(msg chan *model.ListenMsg) {
 		}
 	}
 }
-func (p *Processor) deleteTask(action, remoteAddr string) {
-	switch action {
-	case consts.ActionAll:
-		timer, err := p.Dt.Get(context.TODO(), remoteAddr)
-		if err != nil {
-			return
-		}
-		if len(timer) > 0 {
-			p.gu.Delete(context.TODO(), timer[0].Guid) //远程地址和guid对应关系删除
-		}
-		for _, t := range timer {
-			t.T.Stop()
-			t.Conn.Close() //TODO 强制关闭连接是否有必要?
-		}
-		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
-		p.sl.Delete(context.TODO(), remoteAddr) //从机删除
-		p.al.Delete(context.TODO(), remoteAddr) //告警删除
-		device.OnlineChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.OFFLINE, DeviceId: timer[0].Guid}
-	case consts.ActionCode:
-		p.Dt.Delete(context.TODO(), remoteAddr) //定时删除
-	case consts.ActionSlave:
-		p.sl.Delete(context.TODO(), remoteAddr) //从机删除
-	case consts.ActionAlarm:
-		p.al.Delete(context.TODO(), remoteAddr) //告警删除
+func (p *Processor) deleteTask(remoteAddr string) {
 
+	timer, err := p.TimerStore.Get(context.TODO(), remoteAddr)
+	if err != nil {
+		return
 	}
+	if timer != nil {
+		p.guidStore.Delete(context.TODO(), timer.Guid) //远程地址和guid对应关系删除
+	}
+
+	timer.T.Stop()
+	timer.Conn.Close() //TODO 强制关闭连接是否有必要?
+	line, err := p.LineStore.Get(context.TODO(), remoteAddr)
+	if err != nil {
+		return
+	}
+	line.T.Stop()
+	p.TimerStore.Delete(context.TODO(), remoteAddr)  //定时删除
+	p.LineStore.Delete(context.TODO(), remoteAddr)   //删除slave在线检查
+	p.slaveStore.Delete(context.TODO(), remoteAddr)  //从机删除
+	p.deviceStore.Delete(context.TODO(), remoteAddr) //设备数据删除
+	device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.OFFLINE, DeviceId: timer.Guid}
 
 }
 func (p *Processor) watchPoolEtcd() {
@@ -150,12 +153,12 @@ func (p *Processor) watchPoolEtcd() {
 			for i := range event.Events {
 				switch event.Events[i].Type {
 				case etcd.EventTypePut:
-					fmt.Println(event.Events[i].Key)
+					log.Infof("etcd device data key:%v ,update...", event.Events[i].Key)
 					fmt.Println(event.Events[i].Value)
 					//key := event.Events[i].Key[len("transfer/"+guid):]
 					//giot/device/296424434E48313836FFD805/code
 					ret := strings.Split(event.Events[i].Key, "/")
-					p.activeStore(ret[3], ret[2], event.Events[i].Value)
+					p.activeStore(ret[2], event.Events[i].Value)
 
 					//key := event.Events[i].Key[len(s.opt.BasePath)+1:]
 					//objPtr, err := s.StringToObjPtr(event.Events[i].Value, key)
@@ -165,89 +168,74 @@ func (p *Processor) watchPoolEtcd() {
 					//}
 					//s.cache.Store(key, objPtr)
 				case etcd.EventTypeDelete:
-					fmt.Println("delete...")
 					ret := strings.Split(event.Events[i].Key, "/")
-					remoteAddr, err := p.gu.Get(context.TODO(), ret[2])
+					remoteAddr, err := p.guidStore.Get(context.TODO(), ret[2])
 					if err != nil {
 						return
 					}
-					if ret[2] == consts.ActionCode {
-						p.deleteTask(consts.ActionAll, remoteAddr)
-					} else {
-						p.deleteTask(ret[2], remoteAddr)
-					}
+					log.Infof("etcd device data key:%v ,delete...", event.Events[i].Key)
+
+					p.deleteTask(remoteAddr)
 				}
 			}
 		}
 	})
 }
 
-func (p *Processor) activeStore(action, guid, val string) error {
-	remoteAddr, err := p.gu.Get(context.TODO(), guid)
+func (p *Processor) activeStore(guid, val string) error {
+	remoteAddr, err := p.guidStore.Get(context.TODO(), guid)
 	if err != nil {
 		log.Warnf("not found guid:%s Unable to query remoteAddr", guid)
 		return err
 	}
-	switch action {
-	case consts.ActionCode:
-		timers, err := p.Dt.Get(context.TODO(), remoteAddr)
-		if err != nil {
-			log.Errorf("Unable to get remoteAddr:%s gnet.conn", remoteAddr)
-			return err
-		}
-		for _, t := range timers {
-			t.T.Stop()
-		}
-		de, err := metaDataCompile(val)
-		if err != nil {
-			log.Errorf("guid:%v transfer metadata transform error.", guid)
-			return err
-		}
+	de, err := metaDataCompile(val)
 
-		var timerList []*wheelTimer.SyncTimer
-		//4. 封装定时器
-		for _, v := range de.Ft {
-			if len(v.FCode) > 0 {
-				task := &wheelTimer.SyncTimer{
-					Guid:       de.Guid,
-					Conn:       timers[0].Conn,
-					RemoteAddr: remoteAddr,
-					Time:       v.Tm,
-					Directives: v.FCode,
-				}
-				task.T = p.Tw.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time}, task.Execute)
-				timerList = append(timerList, task)
-
-			}
-		}
-		p.Dt.Update(context.TODO(), remoteAddr, timerList)
-		s, _ := p.Dt.Get(context.TODO(), remoteAddr)
-		for _, c := range s {
-			fmt.Println(c)
-		}
-
-	case consts.ActionSlave:
-		var slaves []*model.Slave
-		err = json.Unmarshal([]byte(val), &slaves)
-		if err != nil {
-			log.Errorf("json unmarshal failed: %s", err)
-			return err
-		}
-
-		p.sl.Update(context.TODO(), remoteAddr, slaves)
-
-	case consts.ActionAlarm:
-		var alarms []*model.Alarm
-		err = json.Unmarshal([]byte(val), &alarms)
-		if err != nil {
-			log.Errorf("json unmarshal failed: %s", err)
-			return err
-		}
-		if len(alarms) > 0 {
-			alarmRule := engine.NewAlarmRule(alarms)
-			p.al.Update(context.TODO(), remoteAddr, alarmRule)
-		}
+	if err != nil {
+		log.Errorf("guid:%v transfer metadata transform error.", guid)
+		return err
 	}
+
+	timers, err := p.TimerStore.Get(context.TODO(), remoteAddr)
+	if err != nil {
+		log.Errorf("Unable to get remoteAddr:%s gnet.conn", remoteAddr)
+		return err
+	}
+	timers.T.Stop()
+	line, err := p.LineStore.Get(context.TODO(), remoteAddr)
+	if err != nil {
+		return err
+	}
+	line.T.Stop()
+	if de.FCode != nil {
+		task := &wheelTimer.SyncTimer{
+			Guid:       de.GuId,
+			Conn:       timers.Conn,
+			RemoteAddr: remoteAddr,
+			Time:       de.FCode.Tm,
+			Directives: de.FCode.FCode,
+		}
+		task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time}, task.Execute)
+		p.TimerStore.Update(context.TODO(), remoteAddr, task)
+	}
+
+	lineTask := &lineTimer.LineTimer{
+		Guid:       guid,
+		RemoteAddr: remoteAddr,
+		Time:       de.FCode.Tm + 15*time.Second,
+		SlaveStore: p.slaveStore,
+	}
+	lineTask.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: lineTask.Time}, lineTask.Execute)
+	p.LineStore.Update(context.TODO(), remoteAddr, lineTask)
+
+	p.slaveStore.Update(context.TODO(), remoteAddr, de.Salve)
+
+	deviceInfo := &model.Device{
+		GuId:         de.GuId,
+		Name:         de.Name,
+		ProductType:  de.ProductType,
+		ProductModel: de.ProductModel,
+	}
+	p.deviceStore.Update(context.TODO(), remoteAddr, deviceInfo)
 
 	return nil
 }
@@ -255,98 +243,98 @@ func (p *Processor) activeStore(action, guid, val string) error {
 /**
   注册
 */
-func (p *Processor) register(data *model.RegisterData) error {
+func (p *Processor) register(data *model.RegisterData) {
 	//开始
 	//1. 判断是否注册过，如果注册过无需重复注册
-	remoteAddr := data.C.RemoteAddr().String()
-	if wt, err := p.gu.Get(context.TODO(), string(data.D)); err == nil {
+	remoteAddr := data.Conn.RemoteAddr().String()
+	//
+	if wt, err := p.guidStore.Get(context.TODO(), data.D); err == nil {
 		if remoteAddr == wt {
 			re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Success)
-			data.C.AsyncWrite(re)
+			data.Conn.AsyncWrite(re, nil)
 			log.Warnf("remoteAddr:%s alike no need to register again", remoteAddr)
 
-			return err
+			return
 		}
 	}
-
+	//没有注册过就etcd查询
 	//2. etcd查询是否有元数据
 	guid := string(data.D)
-	val, err := p.Stg.Get(context.Background(), "device/"+guid+"/code")
+	val, err := p.Stg.Get(context.Background(), "device/"+guid)
 	if err != nil {
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Error)
-		data.C.AsyncWrite(re)
+		data.Conn.AsyncWrite(re, nil)
+		data.Conn.Close()
 		log.Warnf("guid:%v metadata not found.", guid)
 		log4j.Printf("guid:%v remoteAddr:%v注册失败，无法查询到元数据", guid, remoteAddr)
-		return err
+		return
 	}
+	var task *wheelTimer.SyncTimer
 	//3. 认证成功开始配置元数据信息
 	if len(val) > 0 {
 		de, err := metaDataCompile(val)
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Success)
-		data.C.AsyncWrite(re)
+		data.Conn.AsyncWrite(re, nil)
 		if err != nil {
 			log.Errorf("guid:%v transfer metadata transform error.", guid)
-			return err
+			return
 		}
 
-		var timerList []*wheelTimer.SyncTimer
 		//4. 封装定时器
-		for _, v := range de.Ft {
-			if len(v.FCode) > 0 {
-				task := &wheelTimer.SyncTimer{
-					Guid:       de.Guid,
-					Conn:       data.C,
-					RemoteAddr: remoteAddr,
-					Time:       v.Tm,
-					Directives: v.FCode,
-				}
-				task.T = p.Tw.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time}, task.Execute)
-				timerList = append(timerList, task)
 
+		if de.FCode != nil {
+			task = &wheelTimer.SyncTimer{
+				Guid:       de.GuId,
+				Conn:       data.Conn,
+				RemoteAddr: remoteAddr,
+				Time:       de.FCode.Tm,
+				Directives: de.FCode.FCode,
 			}
-		}
-		//先存储一下guid和远程地址对应关系
-		p.gu.Create(context.TODO(), guid, remoteAddr)
-		//5. 获取从机信息
-		sa, err := p.Stg.Get(context.Background(), "device/"+guid+"/salve")
-		var slaves []*model.Slave
-		err = json.Unmarshal([]byte(sa), &slaves)
-		if err != nil {
-			log.Errorf("json unmarshal failed: %s", err)
-			return err
+			task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time}, task.Execute)
 		}
 
-		//6. 获取告警规则
-		tr, err := p.Stg.Get(context.Background(), "device/"+guid+"/alarm")
-		var alarms []*model.Alarm
-		err = json.Unmarshal([]byte(tr), &alarms)
-		if err != nil {
-			log.Errorf("json unmarshal failed: %s", err)
-			return err
+		lineTask := &lineTimer.LineTimer{
+			Guid:       guid,
+			RemoteAddr: remoteAddr,
+			Time:       de.FCode.Tm + 15*time.Second,
+			SlaveStore: p.slaveStore,
 		}
-		if len(timerList) > 0 {
-			p.Dt.Create(context.TODO(), remoteAddr, timerList)
+		lineTask.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: lineTask.Time}, lineTask.Execute)
+
+		//先存储一下guid和远程地址对应关系
+		p.guidStore.Create(context.TODO(), guid, remoteAddr)
+		deviceInfo := &model.Device{
+			GuId:         de.GuId,
+			Name:         de.Name,
+			ProductType:  de.ProductType,
+			ProductModel: de.ProductModel,
 		}
-		if len(slaves) > 0 {
-			p.sl.Create(context.TODO(), remoteAddr, slaves)
+		if de.FCode != nil {
+			p.TimerStore.Create(context.TODO(), remoteAddr, task)
 		}
-		if len(alarms) > 0 {
-			alarmRule := engine.NewAlarmRule(alarms)
-			p.al.Create(context.TODO(), remoteAddr, alarmRule)
+		if lineTask != nil {
+			p.LineStore.Create(context.TODO(), remoteAddr, lineTask)
 		}
-		device.OnlineChan <- &model.DeviceMsg{Ts: time.Now(), Type: consts.ONLINE, DeviceId: de.Guid}
-		log.Infof("register on success,guid:%s remoteAddr:%s", data.D, data.C.RemoteAddr())
+		if len(de.Salve) > 0 {
+			p.slaveStore.Create(context.TODO(), remoteAddr, de.Salve)
+		}
+		if deviceInfo != nil {
+			p.deviceStore.Create(context.TODO(), remoteAddr, deviceInfo)
+		}
+		device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: de.GuId}
+		log.Infof("register on success,guid:%s remoteAddr:%s", data.D, data.Conn.RemoteAddr())
 		log4j.Printf("guid:%v remoteAddr:%v注册成功🧸", guid, remoteAddr)
 
 	}
-	return nil
+	return
 }
-func metaDataCompile(val string) (*model.TimerActive, error) {
-	ma := &model.TimerActive{}
-	err := json.Unmarshal([]byte(val), ma)
+
+func metaDataCompile(val string) (*model.Device, error) {
+	devic := &model.Device{}
+	err := json.Unmarshal([]byte(val), devic)
 	if err != nil {
 		log.Errorf("json unmarshal failed: %s", err)
 		return nil, err
 	}
-	return ma, nil
+	return devic, nil
 }

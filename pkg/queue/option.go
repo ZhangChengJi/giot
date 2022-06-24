@@ -23,8 +23,8 @@ type Option struct {
 func DefaultOption() *Option {
 	return &Option{
 		MinBatchSize: 1,
-		MaxBatchSize: 10,
-		MaxQueueSize: 1000,
+		MaxBatchSize: 1,
+		MaxQueueSize: 100,
 		LingerTime:   50 * time.Microsecond,
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"giot/conf"
 	"giot/internal/virtual/tcp"
 	"giot/pkg/log"
-	"github.com/xormplus/xorm"
 	"os"
 
 	"go.uber.org/zap"
@@ -21,7 +20,6 @@ const (
 )
 
 type server struct {
-	db  *xorm.Engine
 	tcp *tcp.TcpServer
 }
 

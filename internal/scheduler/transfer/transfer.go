@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"giot/internal/scheduler/logic"
+	"giot/internal/virtual/device"
 	"giot/utils"
 	"giot/utils/json"
 	"golang.org/x/text/message"
@@ -14,8 +14,6 @@ import (
 	"giot/internal/model"
 	"giot/internal/notify"
 	"giot/internal/notify/sms"
-	"giot/internal/scheduler/db"
-	broker "giot/internal/scheduler/mqtt"
 	"giot/pkg/log"
 	"giot/pkg/queue"
 	"giot/utils/consts"
@@ -27,83 +25,126 @@ import (
 var qOption *queue.Option = queue.DefaultOption().SetMaxQueueSize(10000).SetMaxBatchSize(100)
 
 type Transfer struct {
-	mqtt      *broker.Broker
+	mq        mqtt.Client
 	td        *sql.DB
 	db        *gorm.DB
 	dataChan  chan []byte
-	alarmChan chan *model.DeviceMsg
+	alarmChan chan *device.DeviceMsg
 	notifier  *notify.Notify
-	q         *queue.Queue
+	queue     *queue.Queue
 }
 
-func SetupTransfer() {
-	t := &Transfer{
-		mqtt: &broker.Broker{
-			Client: broker.Client,
-		},
-		td:        db.Td,
-		db:        db.DB,
-		alarmChan: make(chan *model.DeviceMsg, 1024),
+func Setup(mqtt mqtt.Client, tdengine *sql.DB, mysql *gorm.DB) {
+	var t = &Transfer{
+		mq:        mqtt,
+		td:        tdengine,
+		db:        mysql,
+		alarmChan: make(chan *device.DeviceMsg, 1024),
 		notifier:  notify.New(),
-		// Prepare batch queue
-		q: queue.NewWithOption(qOption),
+		queue:     queue.NewWithOption(queue.DefaultOption()),
 	}
-	t.consume(4)
-	go t.notifyLoop()
-	t.ListenMqtt()
+	t.consume(t.queue, 4, t.td)
+	//go t.notifyLoop()
+	t.listenMqtt()
 }
 
-func (t *Transfer) ListenMqtt() {
-	t.mqtt.Client.Subscribe("device/data/#", 0, t.dataHandler)
-	t.mqtt.Client.Subscribe("device/alarm/#", 0, t.alarmHandler)
-	t.mqtt.Client.Subscribe("device/online/#", 0, t.onlineHandler)
+func (t *Transfer) listenMqtt() {
+	t.mq.Subscribe("device/data/#", 0, t.dataHandler)
+	t.mq.Subscribe("device/alarm/#", 0, t.alarmHandler)
+	t.mq.Subscribe("device/online/#", 0, t.onlineHandler)
 }
 func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
-	var device model.DeviceMsg
+	var device device.DeviceMsg
 	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
 		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
-	t.q.Enqueue(device)
+	t.queue.Enqueue(device)
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
 func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
-	var device model.DeviceMsg
+	var device device.DeviceMsg
 	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
 		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
-
 	t.alarmChan <- &device
-	t.q.Enqueue(device)
+	t.queue.Enqueue(device)
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
 
 func (t *Transfer) onlineHandler(client mqtt.Client, msg mqtt.Message) {
-	var device model.DeviceMsg
+	var device device.DeviceMsg
 	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
 		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
-	switch device.Type {
+	switch device.Status {
 	case consts.ONLINE:
-		logic.Online(device.DeviceId)
+		t.online(device.DeviceId, device.SlaveId)
 		log.Warnf("guid:%s online", device.DeviceId)
 	case consts.OFFLINE:
-		logic.Offline(device.DeviceId)
+		t.offline(device.DeviceId, device.SlaveId)
 		log.Warnf("guid:%s offline", device.DeviceId)
 	}
 
 }
-func FromMqttBytes(bytes []byte, device *model.DeviceMsg) error {
+
+//设备↕上下线
+func (t *Transfer) online(guid string, slaveId int) {
+	if slaveId == 0 {
+		var pigDevice model.PigDevice
+		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and device_id=?", 0, guid).Update("line_status", 1).Error
+		if err != nil {
+			log.Errorf("online guid:%s update failed", guid)
+			return
+		}
+
+	} else {
+		var slave model.PigDeviceSlave
+		fmt.Printf("slave:%v online", slaveId)
+		err := t.db.Debug().Model(&slave).Where("device_id=? and modbus_address=? and line_status=? ", guid, slaveId, 0).Update("line_status", 1).Error
+		if err != nil {
+			log.Errorf("online guid:%s update failed", guid)
+			return
+		}
+	}
+
+}
+func (t *Transfer) offline(guid string, slaveId int) {
+	var slave model.PigDeviceSlave
+	if slaveId == 0 {
+		var pigDevice model.PigDevice
+		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and device_id=?", 1, guid).Update("line_status", 0).Error
+		if err != nil {
+			log.Errorf("offline guid:%s update failed", guid)
+			return
+		}
+		//fmt.Printf("slave:%v offline", slaveId)
+		//err = t.db.Debug().Model(&slave).Where("device_id=? and line_status=? ", guid, 1).Update("line_status", 0).Error
+		//if err != nil {
+		//	log.Errorf("online guid:%s update failed", guid)
+		//	return
+		//}
+	} else {
+		fmt.Printf("slave:%v offline", slaveId)
+		err := t.db.Debug().Model(&slave).Where("device_id=? and modbus_address=? and line_status=? ", guid, slaveId, 1).Update("line_status", 0).Error
+		if err != nil {
+			log.Errorf("online guid:%s update failed", guid)
+			return
+		}
+	}
+}
+
+func FromMqttBytes(bytes []byte, device *device.DeviceMsg) error {
 	return json.Unmarshal(bytes, &device)
 }
 
-func (t *Transfer) consume(workers int) {
+func (t *Transfer) consume(q *queue.Queue, workers int, taos *sql.DB) {
 	for i := 0; i < workers; i++ {
-		go func(q *queue.Queue, taos *sql.DB) {
+		go func(q *queue.Queue) {
 			for {
 				runtime.Gosched()
 				msg, err := q.Dequeue()
@@ -117,13 +158,14 @@ func (t *Transfer) consume(workers int) {
 					continue
 				}
 				runtime.Gosched()
+				fmt.Println("sql:======" + sqlStr)
 				_, err = taos.Exec(sqlStr)
 				if err != nil {
 					log.Errorf("exec query error: %v, the sql command is:\n%s\n", err, sqlStr)
 				}
 
 			}
-		}(t.q, t.td)
+		}(q)
 	}
 }
 
@@ -139,23 +181,24 @@ func (t *Transfer) notifyProvider(action string, metadata *notify.Metadata) {
 
 	}
 }
-func (t *Transfer) notifyLoop() {
-	for {
-		select {
-		case alarm := <-t.alarmChan:
-			for _, action := range alarm.Actions {
-				metadata, err := t.queryNotifyMetadata(action.NotifierId, action.TemplateId, action.NotifyType, alarm.Name, alarm.SlaveId, alarm.AlarmLevel)
-				if err != nil {
-					log.Errorf("query notify metadata failed")
-					return
-				}
-				t.notifyProvider(action.NotifyType, metadata)
-			}
-		case <-time.After(300 * time.Millisecond):
 
-		}
-	}
-}
+//func (t *Transfer) notifyLoop() {
+//	for {
+//		select {
+//		case alarm := <-t.alarmChan:
+//			for _, action := range alarm.Actions {
+//				metadata, err := t.queryNotifyMetadata(action.NotifierId, action.TemplateId, action.NotifyType, alarm.Name, alarm.SlaveId, alarm.AlarmLevel)
+//				if err != nil {
+//					log.Errorf("query notify metadata failed")
+//					return
+//				}
+//				t.notifyProvider(action.NotifyType, metadata)
+//			}
+//		case <-time.After(300 * time.Millisecond):
+//
+//		}
+//	}
+//}
 
 func (t *Transfer) queryNotifyMetadata(cid, tid, notifyType, name string, slaveId int, level int) (*notify.Metadata, error) {
 	var config model.NotifyConfig

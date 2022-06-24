@@ -1,6 +1,7 @@
-package model
+package device
 
 import (
+	"giot/pkg/log"
 	"giot/utils"
 	"giot/utils/consts"
 	"hash/fnv"
@@ -9,20 +10,21 @@ import (
 )
 
 type DeviceMsg struct {
-	Ts         time.Time `json:"timestamp"`
-	Type       string    `json:"type"`
-	Status     bool      `json:"status"`
-	DeviceId   string    `json:"deviceId"`
-	Name       string    `json:"name" `
-	SlaveId    int       `json:"slaveId"`
-	ProductId  string    `json:"productId"`
-	ModelId    string    `json:"modelId"`
-	AlarmId    string    `json:"alarmId"`
-	AlarmLevel int       `json:"alarmLevel"`
-	Data       uint16    `json:"data"`
-	NotifyType string    `json:"notifyType"` //通知类型
-	TemplateId string    `json:"templateId"` //通知模版ID
-	Actions    []*Action
+	Ts       time.Time `json:"timestamp"`
+	DataType string    `json:"dataType"`
+	Level    int       `json:"level"`
+	DeviceId string    `json:"deviceId"`
+	Status   string    `json:"status"`
+	//Name       string    `json:"name" `
+	SlaveId int `json:"slaveId"`
+	//ProductId  string    `json:"productId"`
+	//ModelId    string    `json:"modelId"`
+	//AlarmId    string    `json:"alarmId"`
+	//AlarmLevel int       `json:"alarmLevel"`
+	Data float32 `json:"data"`
+	//NotifyType string    `json:"notifyType"` //通知类型
+	//TemplateId string    `json:"templateId"` //通知模版ID
+	//Actions    []*Action
 }
 
 // Change max partitions as you need.
@@ -37,12 +39,13 @@ func (r DeviceMsg) TaosDatabase() string {
 
 // Auto create table using stable and tags
 func (r DeviceMsg) TaosSTable() string {
-	switch r.Type {
+	switch r.DataType {
 	case consts.DATA:
 		return "device_data"
 	case consts.ALARM:
 		return "device_alarm"
 	default:
+		log.Errorf("无法匹配到表")
 		return ""
 
 	}
@@ -52,17 +55,17 @@ func (r DeviceMsg) TaosSTable() string {
 // tags must be setted with TaosSTable
 func (r DeviceMsg) TaosTags() []interface{} {
 	var tags []interface{}
-	if r.Type == consts.DATA {
-		tags = append(tags, r.ProductId, r.DeviceId, r.SlaveId, r.ModelId)
+	if r.DataType == consts.DATA {
+		tags = append(tags, r.DeviceId, r.SlaveId)
 	} else {
-		tags = append(tags, r.ProductId, r.DeviceId, r.SlaveId, r.ModelId, r.AlarmId)
+		tags = append(tags, r.DeviceId, r.SlaveId)
 	}
 	return tags
 }
 
 // Dynamic device id as table name
 func (r DeviceMsg) TaosTable() string {
-	switch r.Type {
+	switch r.DataType {
 	case consts.DATA:
 		return strings.Join([]string{"device_data", r.DeviceId}, "")
 	case consts.ALARM:
@@ -83,10 +86,10 @@ func (r DeviceMsg) TaosCols() []string {
 func (r DeviceMsg) TaosValues() []interface{} {
 	var values []interface{}
 	values = append(values, r.Ts)
-	if r.Type == consts.DATA {
-		values = append(values, r.Data, r.Status)
+	if r.DataType == consts.DATA {
+		values = append(values, r.Data)
 	} else {
-		values = append(values, r.Data, r.AlarmLevel)
+		values = append(values, r.Data, r.Level)
 	}
 
 	return values

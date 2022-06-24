@@ -6,15 +6,15 @@ import (
 	"giot/internal/virtual/wheelTimer"
 	"giot/pkg/log"
 	cmap "github.com/orcaman/concurrent-map"
-	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet/v2"
 	"github.com/shiningrush/droplet/data"
 )
 
 type DeviceTimerIn interface {
-	Create(ctx context.Context, key string, obj []*wheelTimer.SyncTimer)
-	Get(ctx context.Context, key string) ([]*wheelTimer.SyncTimer, error)
+	Create(ctx context.Context, key string, obj *wheelTimer.SyncTimer)
+	Get(ctx context.Context, key string) (*wheelTimer.SyncTimer, error)
 	GetConn(ctx context.Context, key string) (gnet.Conn, error)
-	Update(ctx context.Context, key string, obj []*wheelTimer.SyncTimer) ([]*wheelTimer.SyncTimer, error)
+	Update(ctx context.Context, key string, obj *wheelTimer.SyncTimer) (*wheelTimer.SyncTimer, error)
 	Delete(ctx context.Context, key string)
 	//DeleteTask(ctx context.Context, RemoteAddr string)
 }
@@ -28,20 +28,20 @@ func NewTimerStore() *TimerStore {
 	return &TimerStore{cache: cmap.New()}
 }
 
-func (t *TimerStore) Create(ctx context.Context, key string, obj []*wheelTimer.SyncTimer) {
+func (t *TimerStore) Create(ctx context.Context, key string, obj *wheelTimer.SyncTimer) {
 	t.cache.Set(key, obj)
 	//	t.guid.Set(RemoteAddr, key)
 }
-func (t *TimerStore) Get(ctx context.Context, key string) ([]*wheelTimer.SyncTimer, error) {
+func (t *TimerStore) Get(ctx context.Context, key string) (*wheelTimer.SyncTimer, error) {
 	fmt.Println("key:", t.cache.Keys())
 	if tmp, ok := t.cache.Get(key); ok {
-		return tmp.([]*wheelTimer.SyncTimer), nil
+		return tmp.(*wheelTimer.SyncTimer), nil
 	} else {
 		log.Warnf("data not found by key: %s", key)
 		return nil, data.ErrNotFound
 	}
 }
-func (t *TimerStore) Update(ctx context.Context, key string, obj []*wheelTimer.SyncTimer) ([]*wheelTimer.SyncTimer, error) {
+func (t *TimerStore) Update(ctx context.Context, key string, obj *wheelTimer.SyncTimer) (*wheelTimer.SyncTimer, error) {
 	t.cache.Set(key, obj)
 	return obj, nil
 }
@@ -54,7 +54,7 @@ func (t *TimerStore) GetConn(ctx context.Context, key string) (gnet.Conn, error)
 	if err != nil {
 		return nil, err
 	}
-	return timers[0].Conn, nil
+	return timers.Conn, nil
 
 }
 

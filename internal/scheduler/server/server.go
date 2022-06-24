@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"giot/conf"
-	"giot/internal/scheduler/logic"
+	"giot/internal/scheduler/device"
 	"giot/internal/scheduler/transfer"
 	"giot/pkg/etcd"
+	"giot/pkg/gorm"
 	"giot/pkg/log"
-	"giot/pkg/modbus"
-	"github.com/xormplus/xorm"
+	"giot/pkg/mqtt"
+	"giot/pkg/tdengine"
 	"os"
 
 	"go.uber.org/zap"
@@ -24,7 +25,6 @@ const (
 )
 
 type server struct {
-	db *xorm.Engine
 }
 
 func NewServer() *server {
@@ -32,31 +32,43 @@ func NewServer() *server {
 }
 
 func (s *server) init() error {
+
 	log.Info("Initialize mysql...")
-	err := s.setupDB()
+	db, err := gorm.New(conf.MysqlConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	log.Info("Initialize tdengine...")
-	err = s.setupTdengine()
+	log.Info("Initialize etcd...")
+	err = etcd.InitETCDClient(conf.ETCDConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	log.Info("Initialize etcd...")
-	err = s.setupEtcd()
+	log.Info("Initialize tdengine...")
+	td, err := tdengine.New(conf.TdengineConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
+
 	log.Info("Initialize mqtt...")
-	err = s.setupMqtt()
+	conf.MqttConfig.ClientId = "scheduler"
+	mq, err := mqtt.New(conf.MqttConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
+
+	err = device.Setup(etcd.GenEtcdStorage(), db)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	go transfer.Setup(mq, td, db)
+
 	return nil
 }
 
@@ -66,9 +78,6 @@ func (s *server) Start(er chan error) {
 		er <- err
 		return
 	}
-	a := &logic.DeviceSvc{Modbus: modbus.NewClient(&modbus.RtuHandler{}), Etcd: etcd.GenEtcdStorage()}
-	a.InitEtcdDataLoad()
-	go transfer.SetupTransfer()
 	s.printInfo()
 }
 

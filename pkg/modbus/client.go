@@ -55,8 +55,11 @@ func (c *client) WriteSingleRegister(slaveId byte, address, quantity uint16, val
 	}
 	return c.rtuHandler.Encode(&request)
 }
-func (c *client) ReadCode(data []byte) (pdu *ProtocolDataUnit, err error) {
+func (c *client) ReadIndustryCode(data []byte) (pdu *ProtocolDataUnit, err error) {
 	return c.rtuHandler.Decode(data)
+}
+func (c *client) ReadHomeCode(data []byte) (pdu *ProtocolDataUnit, err error) {
+	return c.rtuHandler.HomeDecode(data)
 }
 
 // Request:
@@ -153,10 +156,37 @@ func (mb *RtuHandler) Decode(adu []byte) (pdu *ProtocolDataUnit, err error) {
 	}
 	// Function code & data
 	pdu = &ProtocolDataUnit{}
-	pdu.SaveId = adu[0]
-	pdu.FunctionCode = adu[1]
+	pdu.SaveId = adu[0]       //从机id
+	pdu.FunctionCode = adu[1] //功能码
 
-	pdu.Data = adu[3 : len(adu)-2]
+	pdu.Data = adu[3 : len(adu)-2] //数据
+
+	return
+}
+
+var homeCode = [...]byte{0x70, 0x65, 0x66, 0x63, 0x64}
+
+func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ProtocolDataUnit, err error) {
+	length := len(adu)
+	// Calculate checksum
+	var crc crc
+	crc.reset().pushBytes(adu[0 : length-2])
+	checksum := uint16(adu[length-1])<<8 | uint16(adu[length-2])
+	if checksum != crc.value() {
+		err = fmt.Errorf("modbus: response crc '%v' does not match expected '%v'", checksum, crc.value())
+		return
+	}
+	// Function code & data
+	pdu = &ProtocolDataUnit{}
+	pdu.SaveId = adu[0] //从机id
+	for _, b := range homeCode {
+		if b == adu[1] {
+			pdu.FunctionCode = adu[1] //功能码
+			break
+		}
+	}
+
+	pdu.Data = adu[24:32] //数据
 
 	return
 }

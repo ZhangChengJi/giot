@@ -3,15 +3,14 @@ package device
 import (
 	"encoding/json"
 	"fmt"
-	"giot/internal/model"
 	"giot/internal/virtual/mqtt"
 	"time"
 )
 
 var (
-	DataChan   chan *model.DeviceMsg
-	AlarmChan  chan *model.DeviceMsg
-	OnlineChan chan *model.DeviceMsg
+	DataChan   chan *DeviceMsg
+	AlarmChan  chan *DeviceMsg
+	OnlineChan chan *DeviceMsg
 )
 
 type device struct {
@@ -20,15 +19,15 @@ type device struct {
 
 type Interface interface {
 	listenLoop()
-	Insert(data *model.DeviceMsg)
-	InsertAlarm(data *model.DeviceMsg)
-	Online(data *model.DeviceMsg)
+	Insert(data *DeviceMsg)
+	InsertAlarm(data *DeviceMsg)
+	Online(data *DeviceMsg)
 }
 
 func Init() {
-	DataChan = make(chan *model.DeviceMsg)
-	AlarmChan = make(chan *model.DeviceMsg)
-	OnlineChan = make(chan *model.DeviceMsg)
+	DataChan = make(chan *DeviceMsg)
+	AlarmChan = make(chan *DeviceMsg)
+	OnlineChan = make(chan *DeviceMsg)
 	d := &device{mqtt.Broker{Client: mqtt.Client}}
 
 	for i := 0; i < 2; i++ {
@@ -48,25 +47,26 @@ func (d *device) listenLoop() {
 			fmt.Println("我是报警数据", data.Data)
 		case data := <-OnlineChan:
 			d.Online(data)
-			fmt.Println("我是上下线数据", data.Type)
+			fmt.Println("我是上下线数据", data.Status)
 		case <-time.After(300 * time.Millisecond):
 		}
 	}
 }
 
 //发布消息
-func (d *device) Insert(data *model.DeviceMsg) {
+func (d *device) Insert(data *DeviceMsg) {
 	topic := append([]byte("device/data/"), data.DeviceId...)
+	fmt.Println(string(topic))
 	payload, _ := json.Marshal(data)
 	d.Publish(string(topic), payload)
 
 }
-func (d *device) InsertAlarm(data *model.DeviceMsg) {
+func (d *device) InsertAlarm(data *DeviceMsg) {
 	topic := append([]byte("device/alarm/"), data.DeviceId...)
 	payload, _ := json.Marshal(data)
 	d.Publish(string(topic), payload)
 }
-func (d *device) Online(data *model.DeviceMsg) {
+func (d *device) Online(data *DeviceMsg) {
 	topic := append([]byte("device/online/"), data.DeviceId...)
 	payload, _ := json.Marshal(data)
 	d.Publish(string(topic), payload)

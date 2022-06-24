@@ -3,8 +3,8 @@ package wheelTimer
 import (
 	"fmt"
 	"github.com/RussellLuo/timingwheel"
-	"github.com/panjf2000/gnet"
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
+	"github.com/panjf2000/gnet/v2"
 	"sync"
 	"time"
 )
@@ -30,8 +30,9 @@ type Interface interface {
 
 func (t *SyncTimer) Execute() {
 	for _, v := range t.Directives {
-		fmt.Printf("任务下发:%X\n", v)
-		t.Conn.AsyncWrite(v)
+		fmt.Printf("时间:%v——--->任务下发:%X\n", time.Now().Format("2006-01-02 15:04:05"), v)
+		time.Sleep(300 * time.Millisecond)
+		t.Conn.AsyncWrite(v, nil)
 	}
 }
 
@@ -56,19 +57,19 @@ func scheduleTimer() *timingwheel.TimingWheel {
 
 //*********************END****************************//
 
-func Second60Timer() {
-	workerPool.Submit(func() {
-		t := time.NewTicker(time.Second * 60)
-		for {
-			//
-			rtp.Range(func(key, value interface{}) bool {
-				addr := key.(string)
-				c := value.(gnet.Conn)
-				c.AsyncWrite([]byte(fmt.Sprintf("heart beating to %s\n", addr)))
-				return true
-			})
-			<-t.C
-
-		}
-	})
-}
+//func Second60Timer() {
+//	workerPool.Submit(func() {
+//		t := time.NewTicker(time.Second * 60)
+//		for {
+//			//
+//			rtp.Range(func(key, value interface{}) bool {
+//				addr := key.(string)
+//				c := value.(gnet.Conn)
+//				c.AsyncWrite([]byte(fmt.Sprintf("heart beating to %s\n", addr)))
+//				return true
+//			})
+//			<-t.C
+//
+//		}
+//	})
+//}
