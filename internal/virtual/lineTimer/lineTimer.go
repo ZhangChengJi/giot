@@ -89,7 +89,7 @@ func (t *LineStore) Get(ctx context.Context, key string) (*LineTimer, error) {
 	if tmp, ok := t.cache.Get(key); ok {
 		return tmp.(*LineTimer), nil
 	} else {
-		log.Warnf("data not found by key: %s", key)
+		log.Sugar.Warnf("data not found by key: %s", key)
 		return nil, data.ErrNotFound
 	}
 }
@@ -106,7 +106,7 @@ func (t *LineStore) Delete(ctx context.Context, key string) {
 //	if id, ok := t.guid.Get(RemoteAddr); ok {
 //		tw, err := t.Get(context.TODO(), id.(string))
 //		if err != nil {
-//			log.Warnf("RemoteAddr:%s task not empty", RemoteAddr)
+//			logs.Warnf("RemoteAddr:%s task not empty", RemoteAddr)
 //			return
 //		}
 //		tw.T.Stop()

@@ -78,7 +78,7 @@ func InitETCDClient(etcdConf *conf.Etcd) error {
 
 	cli, err := clientv3.New(config)
 	if err != nil {
-		log.Errorf("init etcd failed: %s", err)
+		log.Sugar.Errorf("init etcd failed: %s", err)
 		return fmt.Errorf("init etcd failed: %s", err)
 	}
 	Client = cli
@@ -101,7 +101,7 @@ func NewETCDStorage(etcdConf *conf.Etcd) (*EtcdV3Storage, error) {
 		Password:    etcdConf.Password,
 	})
 	if err != nil {
-		log.Errorf("init etcd failed: %s", err)
+		log.Sugar.Errorf("init etcd failed: %s", err)
 		return nil, fmt.Errorf("init etcd failed: %s", err)
 	}
 
@@ -116,7 +116,7 @@ func NewETCDStorage(etcdConf *conf.Etcd) (*EtcdV3Storage, error) {
 
 func Close() error {
 	if err := Client.Close(); err != nil {
-		log.Errorf("etcd client close failed: %s", err)
+		log.Sugar.Errorf("etcd client close failed: %s", err)
 		return err
 	}
 	return nil
@@ -124,7 +124,7 @@ func Close() error {
 
 func (s *EtcdV3Storage) Close() error {
 	if err := s.client.Close(); err != nil {
-		log.Errorf("etcd client close failed: %s", err)
+		log.Sugar.Errorf("etcd client close failed: %s", err)
 		return err
 	}
 	return nil
@@ -134,11 +134,11 @@ func (s *EtcdV3Storage) Get(ctx context.Context, key string) (string, error) {
 	key = path.Join(s.pathPrefix, key)
 	resp, err := s.client.Get(ctx, key)
 	if err != nil {
-		log.Errorf("etcd get failed: %s", err)
+		log.Sugar.Errorf("etcd get failed: %s", err)
 		return "", fmt.Errorf("etcd get failed: %s", err)
 	}
 	if resp.Count == 0 {
-		log.Warnf("key: %s is not found", key)
+		log.Sugar.Warnf("key: %s is not found", key)
 		return "", fmt.Errorf("key: %s is not found", key)
 	}
 
@@ -149,7 +149,7 @@ func (s *EtcdV3Storage) List(ctx context.Context, key string) ([]Keypair, error)
 	key = path.Join(s.pathPrefix, key)
 	resp, err := s.client.Get(ctx, key, clientv3.WithPrefix())
 	if err != nil {
-		log.Errorf("etcd get failed: %s", err)
+		log.Sugar.Errorf("etcd get failed: %s", err)
 		return nil, fmt.Errorf("etcd get failed: %s", err)
 	}
 	var ret []Keypair
@@ -180,7 +180,7 @@ func (s *EtcdV3Storage) Create(ctx context.Context, key, val string) error {
 	key = path.Join(s.pathPrefix, key)
 	_, err := s.client.Put(ctx, key, val)
 	if err != nil {
-		log.Errorf("etcd put failed: %s", err)
+		log.Sugar.Errorf("etcd put failed: %s", err)
 		return fmt.Errorf("etcd put failed: %s", err)
 	}
 	return nil
@@ -190,7 +190,7 @@ func (s *EtcdV3Storage) Update(ctx context.Context, key, val string) error {
 	key = path.Join(s.pathPrefix, key)
 	_, err := s.client.Put(ctx, key, val)
 	if err != nil {
-		log.Errorf("etcd put failed: %s", err)
+		log.Sugar.Errorf("etcd put failed: %s", err)
 		return fmt.Errorf("etcd put failed: %s", err)
 	}
 	return nil
@@ -200,11 +200,11 @@ func (s *EtcdV3Storage) Delete(ctx context.Context, keys string) error {
 	key := path.Join(s.pathPrefix, keys)
 	resp, err := s.client.Delete(ctx, key)
 	if err != nil {
-		log.Errorf("delete etcd key[%s] failed: %s", key, err)
+		log.Sugar.Errorf("delete etcd key[%s] failed: %s", key, err)
 		return fmt.Errorf("delete etcd key[%s] failed: %s", keys, err)
 	}
 	if resp.Deleted == 0 {
-		log.Warnf("key: %s is not found", key)
+		log.Sugar.Warnf("key: %s is not found", key)
 		return fmt.Errorf("key: %s is not found", keys)
 	}
 
@@ -216,11 +216,11 @@ func (s *EtcdV3Storage) BatchDelete(ctx context.Context, keys []string) error {
 		key := path.Join(s.pathPrefix, keys[i])
 		resp, err := s.client.Delete(ctx, key)
 		if err != nil {
-			log.Errorf("delete etcd key[%s] failed: %s", key, err)
+			log.Sugar.Errorf("delete etcd key[%s] failed: %s", key, err)
 			return fmt.Errorf("delete etcd key[%s] failed: %s", keys[i], err)
 		}
 		if resp.Deleted == 0 {
-			log.Warnf("key: %s is not found", key)
+			log.Sugar.Warnf("key: %s is not found", key)
 			return fmt.Errorf("key: %s is not found", keys[i])
 		}
 	}
@@ -266,7 +266,7 @@ func (s *EtcdV3Storage) Watch(ctx context.Context, key string) <-chan WatchRespo
 				output.Events = append(output.Events, e)
 			}
 			if output.Canceled {
-				log.Error("channel canceled")
+				log.Sugar.Error("channel canceled")
 				output.Error = fmt.Errorf("channel canceled")
 			}
 			ch <- output

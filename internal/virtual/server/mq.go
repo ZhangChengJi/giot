@@ -13,7 +13,7 @@ import (
 func (s *server) setupMqtt() error {
 	conf.MqttConfig.ClientId = "virtual" + strconv.Itoa(rand.New(rand.NewSource(time.Now().UnixNano())).Int())
 	if client, err := mqtt.New(conf.MqttConfig); err != nil {
-		log.Errorf("init mqtt client fail: %w", err)
+		log.Sugar.Errorf("init mqtt client fail: %w", err)
 		return err
 	} else {
 		broker.InitMqtt(client)

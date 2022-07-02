@@ -18,13 +18,12 @@ package conf
 
 import (
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/spf13/viper"
-	"github.com/tidwall/gjson"
 )
 
 const (
@@ -38,30 +37,16 @@ const (
 )
 
 var (
-	ENV              string
-	Schema           gjson.Result
-	WorkDir          = "."
-	ConfigFile       = ""
-	ServerHost       = "0.0.0.0"
-	ServerPort       = 80
-	SSLHost          = "0.0.0.0"
-	SSLPort          = 443
-	SSLCert          string
-	SSLKey           string
-	ETCDConfig       *Etcd
-	MysqlConfig      *Mysql
-	ErrorLogLevel    = "warn"
-	ErrorLogPath     = "logs/error.log"
-	AccessLogPath    = "logs/access.log"
-	UserList         = make(map[string]User, 2)
-	AuthConf         Authentication
-	SSLDefaultStatus = 1 //enable ssl by default
-	ImportSizeLimit  = 10 * 1024 * 1024
-	AllowList        []string
-	Plugins          = map[string]bool{}
-	GnetConfig       *Gnet
-	MqttConfig       *Mqtt
-	TdengineConfig   *Tdengine
+	ENV         string
+	WorkDir     = "."
+	ConfigFile  = ""
+	ETCDConfig  *Etcd
+	MysqlConfig *Mysql
+
+	GnetConfig     *Gnet
+	MqttConfig     *Mqtt
+	TdengineConfig *Tdengine
+	ZapConfig      *Zap
 )
 
 type MTLS struct {
@@ -104,31 +89,6 @@ type Tdengine struct {
 	Keep     int
 	Days     int
 }
-type SSL struct {
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
-	Cert string `mapstructure:"cert"`
-	Key  string `mapstructure:"key"`
-}
-
-type Listen struct {
-	Host string
-	Port int
-}
-
-type ErrorLog struct {
-	Level    string
-	FilePath string `mapstructure:"file_path"`
-}
-
-type AccessLog struct {
-	FilePath string `mapstructure:"file_path"`
-}
-
-type Log struct {
-	ErrorLog  ErrorLog  `mapstructure:"error_log"`
-	AccessLog AccessLog `mapstructure:"access_log"`
-}
 
 type Conf struct {
 	Etcd      Etcd
@@ -136,33 +96,71 @@ type Conf struct {
 	Mysql     Mysql
 	Gnet      Gnet
 	Tdengine  Tdengine
-	Listen    Listen
-	SSL       SSL
-	Log       Log
+	Zap       Zap
 	AllowList []string `mapstructure:"allow_list"`
 	MaxCpu    int      `mapstructure:"max_cpu"`
 }
 
-type User struct {
-	Username string
-	Password string
-}
-
-type Authentication struct {
-	Secret     string
-	ExpireTime int `mapstructure:"expire_time"`
-	Users      []User
-}
-
 type Config struct {
-	Conf           Conf
-	Authentication Authentication
-	Plugins        []string
+	Conf Conf
 }
 type Gnet struct {
 	Addr      string
 	Multicore bool
 	Reuseport bool
+}
+type Zap struct {
+	Level         string `mapstructure:"level" json:"level" yaml:"level"`                            // 级别
+	Prefix        string `mapstructure:"prefix" json:"prefix" yaml:"prefix"`                         // 日志前缀
+	Format        string `mapstructure:"format" json:"format" yaml:"format"`                         // 输出
+	Director      string `mapstructure:"director" json:"director"  yaml:"director"`                  // 日志文件夹
+	EncodeLevel   string `mapstructure:"encode-level" json:"encode-level" yaml:"encode-level"`       // 编码级
+	StacktraceKey string `mapstructure:"stacktrace-key" json:"stacktrace-key" yaml:"stacktrace-key"` // 栈名
+
+	MaxAge       int  `mapstructure:"max-age" json:"max-age" yaml:"max-age"`                      // 日志留存时间
+	ShowLine     bool `mapstructure:"show-line" json:"show-line" yaml:"show-line"`                // 显示行
+	LogInConsole bool `mapstructure:"log-in-console" json:"log-in-console" yaml:"log-in-console"` // 输出控制台
+}
+
+// ZapEncodeLevel 根据 EncodeLevel 返回 zapcore.LevelEncoder
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *Zap) ZapEncodeLevel() zapcore.LevelEncoder {
+	switch {
+	case z.EncodeLevel == "LowercaseLevelEncoder": // 小写编码器(默认)
+		return zapcore.LowercaseLevelEncoder
+	case z.EncodeLevel == "LowercaseColorLevelEncoder": // 小写编码器带颜色
+		return zapcore.LowercaseColorLevelEncoder
+	case z.EncodeLevel == "CapitalLevelEncoder": // 大写编码器
+		return zapcore.CapitalLevelEncoder
+	case z.EncodeLevel == "CapitalColorLevelEncoder": // 大写编码器带颜色
+		return zapcore.CapitalColorLevelEncoder
+	default:
+		return zapcore.LowercaseLevelEncoder
+	}
+}
+
+// TransportLevel 根据字符串转化为 zapcore.Level
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *Zap) TransportLevel() zapcore.Level {
+	z.Level = strings.ToLower(z.Level)
+	switch z.Level {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.WarnLevel
+	case "dpanic":
+		return zapcore.DPanicLevel
+	case "panic":
+		return zapcore.PanicLevel
+	case "fatal":
+		return zapcore.FatalLevel
+	default:
+		return zapcore.DebugLevel
+	}
 }
 
 // TODO: we should no longer use init() function after remove all handler's integration tests
@@ -210,25 +208,9 @@ func setupConfig() {
 		panic(fmt.Sprintf("fail to unmarshal configuration: %s, err: %s", ConfigFile, err.Error()))
 	}
 
-	// listen
-	if config.Conf.Listen.Port != 0 {
-		ServerPort = config.Conf.Listen.Port
+	if len(config.Conf.Zap.Level) > 0 {
+		initZapConfig(config.Conf.Zap)
 	}
-	if config.Conf.Listen.Host != "" {
-		ServerHost = config.Conf.Listen.Host
-	}
-
-	// SSL
-	if config.Conf.SSL.Port != 0 {
-		SSLPort = config.Conf.SSL.Port
-	}
-	if config.Conf.SSL.Cert != "" {
-		SSLCert = config.Conf.SSL.Cert
-	}
-	if config.Conf.SSL.Key != "" {
-		SSLKey = config.Conf.SSL.Key
-	}
-
 	// ETCD Storage
 	if len(config.Conf.Etcd.Endpoints) > 0 {
 		initEtcdConfig(config.Conf.Etcd)
@@ -248,54 +230,9 @@ func setupConfig() {
 		initMqtt(config.Conf.Mqtt)
 	}
 
-	// error log
-	if config.Conf.Log.ErrorLog.Level != "" {
-		ErrorLogLevel = config.Conf.Log.ErrorLog.Level
-	}
-	if config.Conf.Log.ErrorLog.FilePath != "" {
-		ErrorLogPath = config.Conf.Log.ErrorLog.FilePath
-	}
-
-	// access log
-	if config.Conf.Log.AccessLog.FilePath != "" {
-		AccessLogPath = config.Conf.Log.AccessLog.FilePath
-	}
-
-	if !filepath.IsAbs(ErrorLogPath) {
-		if strings.HasPrefix(ErrorLogPath, "winfile") {
-			return
-		}
-		ErrorLogPath, err = filepath.Abs(filepath.Join(WorkDir, ErrorLogPath))
-		if err != nil {
-			panic(err)
-		}
-		if runtime.GOOS == "windows" {
-			ErrorLogPath = `winfile:///` + ErrorLogPath
-		}
-	}
-	if !filepath.IsAbs(AccessLogPath) {
-		if strings.HasPrefix(AccessLogPath, "winfile") {
-			return
-		}
-		AccessLogPath, err = filepath.Abs(filepath.Join(WorkDir, AccessLogPath))
-		if err != nil {
-			panic(err)
-		}
-		if runtime.GOOS == "windows" {
-			AccessLogPath = `winfile:///` + AccessLogPath
-		}
-	}
-
-	AllowList = config.Conf.AllowList
-
 	// set degree of parallelism
 	initParallelism(config.Conf.MaxCpu)
 
-	// set authentication
-	//initAuthentication(config.Authentication)
-
-	// set plugin
-	initPlugins(config.Plugins)
 }
 
 func setupEnv() {
@@ -305,33 +242,21 @@ func setupEnv() {
 	}
 }
 
-//func initAuthentication(conf Authentication) {
-//	AuthConf = conf
-//	if AuthConf.Secret == "secret" {
-//		AuthConf.Secret = utils.GetFlakeUidStr()
-//	}
-//
-//	userList := conf.Users
-//	// create user list
-//	for _, item := range userList {
-//		UserList[item.Username] = item
-//	}
-//}
-
-func initPlugins(plugins []string) {
-	for _, pluginName := range plugins {
-		Plugins[pluginName] = true
+func initZapConfig(conf Zap) {
+	if conf.Level != "" {
+		ZapConfig = &Zap{
+			Level:         conf.Level,
+			Prefix:        conf.Prefix,
+			Format:        conf.Format,
+			Director:      conf.Director,
+			EncodeLevel:   conf.EncodeLevel,
+			StacktraceKey: conf.StacktraceKey,
+			MaxAge:        conf.MaxAge,
+			ShowLine:      conf.ShowLine,
+			LogInConsole:  conf.LogInConsole,
+		}
 	}
 }
-
-//func initSchema() {
-//	filePath := WorkDir + "/conf/schema.json"
-//	if schemaContent, err := ioutil.ReadFile(filePath); err != nil {
-//		panic(fmt.Sprintf("fail to read configuration: %s", filePath))
-//	} else {
-//		Schema = gjson.ParseBytes(schemaContent)
-//	}
-//}
 
 // initialize etcd config
 func initEtcdConfig(conf Etcd) {

@@ -40,7 +40,7 @@ func (r DeviceMsg) TaosSTable() string {
 	case consts.ALARM:
 		return "device_alarm"
 	default:
-		log.Errorf("无法匹配到表")
+		log.Sugar.Errorf("无法匹配到表")
 		return ""
 
 	}

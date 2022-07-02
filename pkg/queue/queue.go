@@ -183,7 +183,7 @@ func (q *Queue) Enqueue(msgs ...interface{}) (int, error) {
 			success++
 			q.enqueuedWith(1)
 		}
-		// log.Printf("Queue size: %v, chan len: %v", q.Size(), len(q.queue))
+		// logs.Printf("Queue size: %v, chan len: %v", q.Size(), len(q.queue))
 		return add, nil
 	}
 }
@@ -246,7 +246,7 @@ func (q *Queue) Dequeue() ([]interface{}, error) {
 	if q.NonBlocking() {
 		return msgs, err
 	}
-	// log.Println(err)
+	// logs.Println(err)
 	if err == ErrQueueEmpty {
 		return nil, ErrQueueEmpty
 	}
@@ -259,7 +259,7 @@ func (q *Queue) Dequeue() ([]interface{}, error) {
 			for {
 				runtime.Gosched()
 				if q.isBatchable() && !q.IsEmpty() {
-					// log.Printf("batchable now!")
+					// logs.Printf("batchable now!")
 					ch <- true
 				}
 			}
@@ -268,7 +268,7 @@ func (q *Queue) Dequeue() ([]interface{}, error) {
 		case <-time.After(q.option.LingerTime):
 			return q.takeBatch(batchSize, true)
 		case <-batchable:
-			// log.Printf("batchable branch!")
+			// logs.Printf("batchable branch!")
 			return q.takeBatch(batchSize, true)
 		}
 	}

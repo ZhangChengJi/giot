@@ -30,7 +30,7 @@ func (t *GuidStore) Get(ctx context.Context, key string) (string, error) {
 	if tmp, ok := t.cache.Get(key); ok {
 		return tmp.(string), nil
 	} else {
-		log.Warnf("data not found by key: %s", key)
+		log.Sugar.Warnf("data not found by key: %s", key)
 		return "", data.ErrNotFound
 	}
 }

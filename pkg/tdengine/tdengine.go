@@ -15,7 +15,7 @@ func New(conf *conf.Tdengine) (*sql.DB, error) {
 	//open connect to taos server
 	db, err := sql.Open("taosSql", url)
 	if err != nil {
-		log.Fatalf("Open database error: %s\n", err)
+		log.Sugar.Fatalf("Open database error: %s\n", err)
 	}
 	err = db.Ping()
 	fmt.Println("🪅Tdengine Connection Successful........")

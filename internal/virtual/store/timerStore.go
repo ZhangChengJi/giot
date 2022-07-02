@@ -37,7 +37,7 @@ func (t *TimerStore) Get(ctx context.Context, key string) (*wheelTimer.SyncTimer
 	if tmp, ok := t.cache.Get(key); ok {
 		return tmp.(*wheelTimer.SyncTimer), nil
 	} else {
-		log.Warnf("data not found by key: %s", key)
+		log.Sugar.Warnf("data not found by key: %s", key)
 		return nil, data.ErrNotFound
 	}
 }
@@ -62,7 +62,7 @@ func (t *TimerStore) GetConn(ctx context.Context, key string) (gnet.Conn, error)
 //	if id, ok := t.guid.Get(RemoteAddr); ok {
 //		tw, err := t.Get(context.TODO(), id.(string))
 //		if err != nil {
-//			log.Warnf("RemoteAddr:%s task not empty", RemoteAddr)
+//			logs.Warnf("RemoteAddr:%s task not empty", RemoteAddr)
 //			return
 //		}
 //		tw.T.Stop()

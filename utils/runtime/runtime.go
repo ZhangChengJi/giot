@@ -51,8 +51,8 @@ func logPanic(r interface{}) {
 	stacktrace := make([]byte, size)
 	stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
 	if _, ok := r.(string); ok {
-		log.Errorf("observed a panic: %s\n%s", r, stacktrace)
+		log.Sugar.Errorf("observed a panic: %s\n%s", r, stacktrace)
 	} else {
-		log.Errorf("observed a panic: %#v (%v)\n%s", r, r, stacktrace)
+		log.Sugar.Errorf("observed a panic: %#v (%v)\n%s", r, r, stacktrace)
 	}
 }

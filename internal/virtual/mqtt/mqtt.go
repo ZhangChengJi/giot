@@ -24,7 +24,7 @@ func InitMqtt(c mqtt.Client) {
 //
 //	}); token.Wait() && token.Error() != nil {
 //		fmt.Println(token.Error())
-//		log.Error("subscribe topic:%s failed", topic)
+//		logs.Error("subscribe topic:%s failed", topic)
 //		return
 //
 //	}

@@ -49,7 +49,7 @@ func (t *Transfer) listenMqtt() {
 func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
 	var device device.DeviceMsg
 	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
-		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
+		log.Sugar.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
 	t.queue.Enqueue(device)
@@ -59,7 +59,7 @@ func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
 func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
 	var device device.DeviceMsg
 	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
-		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
+		log.Sugar.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
 	t.alarmChan <- &device
@@ -71,16 +71,16 @@ func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
 func (t *Transfer) onlineHandler(client mqtt.Client, msg mqtt.Message) {
 	var device device.DeviceMsg
 	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
-		log.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
+		log.Sugar.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
 	switch device.Status {
 	case consts.ONLINE:
 		t.online(device.DeviceId, device.SlaveId)
-		log.Warnf("guid:%s online", device.DeviceId)
+		log.Sugar.Warnf("guid:%s online", device.DeviceId)
 	case consts.OFFLINE:
 		t.offline(device.DeviceId, device.SlaveId)
-		log.Warnf("guid:%s offline", device.DeviceId)
+		log.Sugar.Warnf("guid:%s offline", device.DeviceId)
 	}
 
 }
@@ -91,7 +91,7 @@ func (t *Transfer) online(guid string, slaveId int) {
 		var pigDevice model.PigDevice
 		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and id=?", 0, guid).Update("line_status", 1).Error
 		if err != nil {
-			log.Errorf("online guid:%s update failed", guid)
+			log.Sugar.Errorf("online guid:%s update failed", guid)
 			return
 		}
 
@@ -100,7 +100,7 @@ func (t *Transfer) online(guid string, slaveId int) {
 		fmt.Printf("slave:%v online", slaveId)
 		err := t.db.Debug().Model(&slave).Where("device_id=? and modbus_address=? and line_status=? ", guid, slaveId, 0).Update("line_status", 1).Error
 		if err != nil {
-			log.Errorf("online guid:%s update failed", guid)
+			log.Sugar.Errorf("online guid:%s update failed", guid)
 			return
 		}
 	}
@@ -112,20 +112,20 @@ func (t *Transfer) offline(guid string, slaveId int) {
 		var pigDevice model.PigDevice
 		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and id=?", 1, guid).Update("line_status", 0).Error
 		if err != nil {
-			log.Errorf("offline guid:%s update failed", guid)
+			log.Sugar.Errorf("offline guid:%s update failed", guid)
 			return
 		}
 		//fmt.Printf("slave:%v offline", slaveId)
 		//err = t.db.Debug().Model(&slave).Where("id=? and line_status=? ", guid, 1).Update("line_status", 0).Error
 		//if err != nil {
-		//	log.Errorf("online guid:%s update failed", guid)
+		//	logs.Errorf("online guid:%s update failed", guid)
 		//	return
 		//}
 	} else {
 		fmt.Printf("slave:%v offline", slaveId)
 		err := t.db.Debug().Model(&slave).Where("device_id=? and modbus_address=? and line_status=? ", guid, slaveId, 1).Update("line_status", 0).Error
 		if err != nil {
-			log.Errorf("online guid:%s update failed", guid)
+			log.Sugar.Errorf("online guid:%s update failed", guid)
 			return
 		}
 	}
@@ -147,14 +147,14 @@ func (t *Transfer) consume(q *queue.Queue, workers int, taos *sql.DB) {
 				}
 				sqlStr, err := utils.ToTaosBatchInsertSql(msg)
 				if err != nil {
-					log.Errorf("cannot build sql with records: %v", err)
+					log.Sugar.Errorf("cannot build sql with records: %v", err)
 					continue
 				}
 				runtime.Gosched()
 				fmt.Println("sql:======" + sqlStr)
 				_, err = taos.Exec(sqlStr)
 				if err != nil {
-					log.Errorf("exec query error: %v, the sql command is:\n%s\n", err, sqlStr)
+					log.Sugar.Errorf("exec query error: %v, the sql command is:\n%s\n", err, sqlStr)
 				}
 
 			}

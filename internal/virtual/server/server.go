@@ -3,12 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
-	"giot/conf"
 	"giot/internal/virtual/tcp"
 	"giot/pkg/log"
 	"os"
 
-	"go.uber.org/zap"
 	"net/http"
 	"time"
 )
@@ -29,13 +27,13 @@ func NewServer() *server {
 
 func (s *server) init() error {
 
-	log.Info("Initialize etcd...")
+	log.Sugar.Info("Initialize etcd...")
 	err := s.setupStore()
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	log.Info("Initialize mqtt...")
+	log.Sugar.Info("Initialize mqtt...")
 	err = s.setupMqtt()
 	if err != nil {
 		fmt.Println(err)
@@ -65,20 +63,18 @@ func (s *server) shutdownServer(server *http.Server) {
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			log.Error("Shutting down server error: %s", zap.Error(err))
+			log.Sugar.Errorf("Shutting down server error: %v", err)
 		}
 	}
 }
 func (s *server) printInfo() {
 	time.Sleep(200 * time.Millisecond)
-	fmt.Fprint(os.Stdout, "The virtual is running successfully!\n")
+	fmt.Fprint(os.Stdout, "The giot virtual is running successfully!\n")
 	fmt.Fprint(os.Stdout, "🔫 哒哒哒哒哒......\n")
 	//utils.PrintVersion()
 	//fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "Listen", conf.ServerHost, conf.ServerPort)
-	if conf.SSLCert != "" && conf.SSLKey != "" {
-		fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "HTTPS Listen", conf.SSLHost, conf.SSLPort)
-	}
-	fmt.Fprintf(os.Stdout, "%-8s: %s\n", "Loglevel", conf.ErrorLogLevel)
-	fmt.Fprintf(os.Stdout, "%-8s: %s\n", "ErrorLogFile", conf.ErrorLogPath)
-	fmt.Fprintf(os.Stdout, "%-8s: %s\n\n", "AccessLogFile", conf.AccessLogPath)
+
+	//fmt.Fprintf(os.Stdout, "%-8s: %s\n", "Loglevel", conf.ErrorLogLevel)
+	//fmt.Fprintf(os.Stdout, "%-8s: %s\n", "ErrorLogFile", conf.ErrorLogPath)
+	//fmt.Fprintf(os.Stdout, "%-8s: %s\n\n", "AccessLogFile", conf.AccessLogPath)
 }

@@ -59,7 +59,7 @@ func (device *Device) DeviceLister() error {
 		var changeData model.DeviceChange
 		err := json.Unmarshal(message.Payload(), &changeData)
 		if err != nil {
-			log.Error("topic：'device/change' deviceData failed:%s", err)
+			log.Sugar.Errorf("topic：'device/change' deviceData failed:%s", err)
 			return
 		}
 		if changeData.ChangeType == consts.Update || changeData.ChangeType == consts.Add {
@@ -103,20 +103,20 @@ func (device *Device) DeviceLister() error {
 		}
 		if changeData.ChangeType == consts.Delete {
 			if err = device.etcd.Delete(context.TODO(), "device/"+changeData.DeviceId); err != nil {
-				log.Error("delete etcd deivceId :%v", changeData.DeviceId)
+				log.Sugar.Errorf("delete etcd deivceId :%v", changeData.DeviceId)
 			}
 
 		}
 	}); token.Wait() && token.Error() != nil {
 		fmt.Println(token.Error())
-		log.Error("subscribe topic:%s failed", "device/change")
+		log.Sugar.Errorf("subscribe topic:%s failed", "device/change")
 		return token.Error()
 
 	}
 	return nil
 }
 func (device *Device) deviceLoad() error {
-	log.Info("Initialize device load.....")
+	log.Sugar.Info("Initialize device load.....")
 	size := 10
 	page := 1
 
@@ -186,7 +186,7 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 		var property *model.PigProperty
 		err = device.db.Where(&model.PigProperty{Id: s.PropertyId}).First(&property).Error
 		if err != nil {
-			log.Error("load property no found.", err)
+			log.Sugar.Errorf("load property no found.", err)
 			return nil, err
 		}
 
@@ -214,7 +214,7 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 			var deviceAlarm *model.PigPropertyAlarm
 			err = device.db.Where(&model.PigPropertyAlarm{Id: property.AlarmId, AlarmStatus: DEVICE_ENABLE}).First(&deviceAlarm).Error
 			if err != nil {
-				log.Error("load property alarm no found.", err)
+				log.Sugar.Error("load property alarm no found.", err)
 				return nil, err
 			}
 			//[{"level": "3", "operator": "eq", "filterValue": "30", "leftValueType": "1"}]

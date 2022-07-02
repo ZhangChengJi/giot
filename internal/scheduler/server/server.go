@@ -35,27 +35,27 @@ func NewServer() *server {
 
 func (s *server) init() error {
 
-	log.Info("Initialize mysql...")
+	log.Sugar.Info("Initialize mysql...")
 	db, err := gorm.New(conf.MysqlConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	log.Info("Initialize etcd...")
+	log.Sugar.Info("Initialize etcd...")
 	err = etcd.InitETCDClient(conf.ETCDConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	log.Info("Initialize tdengine...")
+	log.Sugar.Info("Initialize tdengine...")
 	td, err := tdengine.New(conf.TdengineConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	log.Info("Initialize mqtt...")
+	log.Sugar.Info("Initialize mqtt...")
 	conf.MqttConfig.ClientId = "scheduler" + strconv.Itoa(rand.New(rand.NewSource(time.Now().UnixNano())).Int())
 
 	mq, err := mqtt.New(conf.MqttConfig)
@@ -95,18 +95,16 @@ func (s *server) shutdownServer(server *http.Server) {
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			log.Error("Shutting down server error: %s", zap.Error(err))
+			log.Sugar.Errorf("Shutting down server error: %s", zap.Error(err))
 		}
 	}
 }
 func (s *server) printInfo() {
-	fmt.Fprint(os.Stdout, "The giot is running successfully!\n\n")
+	fmt.Fprint(os.Stdout, "The giot scheduler is running successfully!\n\n")
 	//utils.PrintVersion()
-	fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "Listen", conf.ServerHost, conf.ServerPort)
-	if conf.SSLCert != "" && conf.SSLKey != "" {
-		fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "HTTPS Listen", conf.SSLHost, conf.SSLPort)
-	}
-	fmt.Fprintf(os.Stdout, "%-8s: %s\n", "Loglevel", conf.ErrorLogLevel)
-	fmt.Fprintf(os.Stdout, "%-8s: %s\n", "ErrorLogFile", conf.ErrorLogPath)
-	fmt.Fprintf(os.Stdout, "%-8s: %s\n\n", "AccessLogFile", conf.AccessLogPath)
+	//fmt.Fprintf(os.Stdout, "%-8s: %s:%d\n", "Listen", conf.ServerHost, conf.ServerPort)
+	//
+	//fmt.Fprintf(os.Stdout, "%-8s: %s\n", "Loglevel", conf.ErrorLogLevel)
+	//fmt.Fprintf(os.Stdout, "%-8s: %s\n", "ErrorLogFile", conf.ErrorLogPath)
+	//fmt.Fprintf(os.Stdout, "%-8s: %s\n\n", "AccessLogFile", conf.AccessLogPath)
 }

@@ -1,97 +1,128 @@
 package log
 
 import (
+	"fmt"
 	"giot/conf"
-	"os"
-
+	"giot/utils"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
+	"time"
 )
 
-var logger *zap.SugaredLogger
+var Zap = new(_zap)
 
-// TODO: we should no longer use init() function after remove all handler's integration tests
-// ENV=test is for integration tests only, other ENV should call "InitLogger" explicitly
-func init() {
-	if env := os.Getenv("ENV"); env == conf.EnvTEST {
-		InitLogger()
+type _zap struct{}
+
+var Sugar *zap.SugaredLogger
+
+func New() (logger *zap.Logger) {
+
+	if ok, _ := utils.PathExists(conf.ZapConfig.Director); !ok { // 判断是否有Director文件夹
+		fmt.Printf("create %v directory\n", conf.ZapConfig.Director)
+		_ = os.Mkdir(conf.ZapConfig.Director, os.ModePerm)
+	}
+
+	cores := Zap.GetZapCores()
+	logger = zap.New(zapcore.NewTee(cores...))
+
+	if conf.ZapConfig.ShowLine {
+		logger = logger.WithOptions(zap.AddCaller())
+	}
+	Sugar = logger.Sugar()
+	return logger
+}
+
+// GetEncoder 获取 zapcore.Encoder
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *_zap) GetEncoder() zapcore.Encoder {
+	if conf.ZapConfig.Format == "json" {
+		return zapcore.NewJSONEncoder(z.GetEncoderConfig())
+	}
+	return zapcore.NewConsoleEncoder(z.GetEncoderConfig())
+}
+
+// GetEncoderConfig 获取zapcore.EncoderConfig
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *_zap) GetEncoderConfig() zapcore.EncoderConfig {
+	return zapcore.EncoderConfig{
+		MessageKey:     "message",
+		LevelKey:       "level",
+		TimeKey:        "time",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		StacktraceKey:  conf.ZapConfig.StacktraceKey,
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    conf.ZapConfig.ZapEncodeLevel(),
+		EncodeTime:     z.CustomTimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.FullCallerEncoder,
 	}
 }
 
-func InitLogger() {
-	logger = GetLogger(ErrorLog)
-}
-
-func GetLogger(logType Type) *zap.SugaredLogger {
-	writeSyncer := fileWriter(logType)
-	encoder := getEncoder(logType)
-	logLevel := getLogLevel()
-	if logType == AccessLog {
-		logLevel = zapcore.InfoLevel
-	}
-
-	core := zapcore.NewCore(encoder, writeSyncer, logLevel)
-
-	zapLogger := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(2))
-
-	return zapLogger.Sugar()
-}
-
-func getLogLevel() zapcore.LevelEnabler {
-	level := zapcore.WarnLevel
-	switch conf.ErrorLogLevel {
-	case "debug":
-		level = zapcore.DebugLevel
-	case "info":
-		level = zapcore.InfoLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	case "panic":
-		level = zapcore.PanicLevel
-	case "fatal":
-		level = zapcore.FatalLevel
-	}
-	return level
-}
-
-func getEncoder(logType Type) zapcore.Encoder {
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-
-	if logType == AccessLog {
-		encoderConfig.LevelKey = zapcore.OmitKey
-	}
-
-	return zapcore.NewConsoleEncoder(encoderConfig)
-}
-
-func fileWriter(logType Type) zapcore.WriteSyncer {
-	logPath := conf.ErrorLogPath
-	if logType == AccessLog {
-		logPath = conf.AccessLogPath
-	}
-	//standard output
-	if logPath == "/dev/stdout" {
-		return zapcore.Lock(os.Stdout)
-	}
-	if logPath == "/dev/stderr" {
-		return zapcore.Lock(os.Stderr)
-	}
-
-	writer, _, err := zap.Open(logPath)
+// GetEncoderCore 获取Encoder的 zapcore.Core
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *_zap) GetEncoderCore(l zapcore.Level, level zap.LevelEnablerFunc) zapcore.Core {
+	writer, err := FileRotatelogs.GetWriteSyncer(l.String()) // 使用file-rotatelogs进行日志分割
 	if err != nil {
-		panic(err)
+		fmt.Printf("Get Write Syncer Failed err:%v", err.Error())
+		return nil
 	}
-	return writer
+
+	return zapcore.NewCore(z.GetEncoder(), writer, level)
 }
 
-func getZapFields(logger *zap.SugaredLogger, fields []interface{}) *zap.SugaredLogger {
-	if len(fields) == 0 {
-		return logger
-	}
+// CustomTimeEncoder 自定义日志输出时间格式
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *_zap) CustomTimeEncoder(t time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+	encoder.AppendString(t.Format(conf.ZapConfig.Prefix + "2006/01/02 - 15:04:05.000"))
+}
 
-	return logger.With(fields)
+// GetZapCores 根据配置文件的Level获取 []zapcore.Core
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *_zap) GetZapCores() []zapcore.Core {
+	cores := make([]zapcore.Core, 0, 7)
+	for level := conf.ZapConfig.TransportLevel(); level <= zapcore.FatalLevel; level++ {
+		cores = append(cores, z.GetEncoderCore(level, z.GetLevelPriority(level)))
+	}
+	return cores
+}
+
+// GetLevelPriority 根据 zapcore.Level 获取 zap.LevelEnablerFunc
+// Author [SliverHorn](https://github.com/SliverHorn)
+func (z *_zap) GetLevelPriority(level zapcore.Level) zap.LevelEnablerFunc {
+	switch level {
+	case zapcore.DebugLevel:
+		return func(level zapcore.Level) bool { // 调试级别
+			return level == zap.DebugLevel
+		}
+	case zapcore.InfoLevel:
+		return func(level zapcore.Level) bool { // 日志级别
+			return level == zap.InfoLevel
+		}
+	case zapcore.WarnLevel:
+		return func(level zapcore.Level) bool { // 警告级别
+			return level == zap.WarnLevel
+		}
+	case zapcore.ErrorLevel:
+		return func(level zapcore.Level) bool { // 错误级别
+			return level == zap.ErrorLevel
+		}
+	case zapcore.DPanicLevel:
+		return func(level zapcore.Level) bool { // dpanic级别
+			return level == zap.DPanicLevel
+		}
+	case zapcore.PanicLevel:
+		return func(level zapcore.Level) bool { // panic级别
+			return level == zap.PanicLevel
+		}
+	case zapcore.FatalLevel:
+		return func(level zapcore.Level) bool { // 终止级别
+			return level == zap.FatalLevel
+		}
+	default:
+		return func(level zapcore.Level) bool { // 调试级别
+			return level == zap.DebugLevel
+		}
+	}
 }

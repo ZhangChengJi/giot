@@ -71,7 +71,7 @@ func TestDequeueGoroutines(t *testing.T) {
 				log.Printf("error: goroutine %d -> %v -> %v, in queue %v\n", i, ret, err, q)
 				return
 			}
-			// log.Printf("completed: enqueued %d, dequeued %d\n", q.enqueued, q.dequeued)
+			// logs.Printf("completed: enqueued %d, dequeued %d\n", q.enqueued, q.dequeued)
 			for i := 0; i < len(ret); i++ {
 				wg.Done()
 			}
@@ -109,7 +109,7 @@ func TestPause(t *testing.T) {
 				log.Printf("error: goroutine %d -> %v -> %v, in queue %v\n", i, ret, err, q)
 				return
 			}
-			// log.Printf("completed: enqueued %d, dequeued %d\n", q.enqueued, q.dequeued)
+			// logs.Printf("completed: enqueued %d, dequeued %d\n", q.enqueued, q.dequeued)
 			for i := 0; i < len(ret); i++ {
 				wg.Done()
 			}

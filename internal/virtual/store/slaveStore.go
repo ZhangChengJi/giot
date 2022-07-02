@@ -31,7 +31,7 @@ func (t *SlaveStore) Get(ctx context.Context, key string) ([]*model.Slave, error
 	if tmp, ok := t.cache.Get(key); ok {
 		return tmp.([]*model.Slave), nil
 	} else {
-		log.Warnf("data not found by key: %s", key)
+		log.Sugar.Warnf("data not found by key: %s", key)
 		return nil, data.ErrNotFound
 	}
 }
@@ -46,7 +46,7 @@ func (t *SlaveStore) GetSlave(ctx context.Context, key string, slaveId byte) (*m
 			return a, nil
 		}
 	}
-	log.Warnf("attributeId not found by key: %s", key)
+	log.Sugar.Warnf("attributeId not found by key: %s", key)
 	return nil, data.ErrNotFound
 }
 func (t *SlaveStore) Update(ctx context.Context, key string, obj []*model.Slave) ([]*model.Slave, error) {

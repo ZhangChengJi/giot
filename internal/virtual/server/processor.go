@@ -48,7 +48,7 @@ type ProcessorIn interface {
 	activeStore(guid, val string) error
 	register(data *model.RegisterData) error
 	deleteTask(remoteAddr string)
-	checkLine(guid, remoteAddr string, duration time.Duration)
+	clearConnect(guid, remoteAddr string, duration time.Duration)
 }
 
 func (p *Processor) Swift(reg chan *model.RegisterData) {
@@ -87,9 +87,14 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 						}
 						slave.Alarm.AlarmRule(slave.SlaveId, result.Data, result.FunctionCode, info)
 					} else {
-						log.Errorf("salve:%s not found", result.SaveId)
+						log.Sugar.Errorf("salve:%s not found", result.SaveId)
 					}
 				}
+			} else {
+				re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Error)
+				data.Conn.Write(re)
+				data.Conn.Close()
+				fmt.Println("未注册强制断开连接")
 			}
 		case <-time.After(200 * time.Millisecond):
 			//等待缓冲
@@ -144,12 +149,12 @@ func (p *Processor) watchPoolEtcd() {
 		defer cancel()
 		for event := range ch {
 			if event.Canceled {
-				log.Warnf("watch failed: %s", event.Error)
+				log.Sugar.Warnf("watch failed: %s", event.Error)
 			}
 			for i := range event.Events {
 				switch event.Events[i].Type {
 				case etcd.EventTypePut:
-					log.Infof("etcd device data key:%v ,update...", event.Events[i].Key)
+					log.Sugar.Infof("etcd device data key:%v ,update...", event.Events[i].Key)
 					fmt.Println(event.Events[i].Value)
 					//key := event.Events[i].Key[len("transfer/"+guid):]
 					//giot/device/296424434E48313836FFD805/code
@@ -159,7 +164,7 @@ func (p *Processor) watchPoolEtcd() {
 					//key := event.Events[i].Key[len(s.opt.BasePath)+1:]
 					//objPtr, err := s.StringToObjPtr(event.Events[i].Value, key)
 					//if err != nil {
-					//	log.Warnf("value convert to obj failed: %s", err)
+					//	logs.Warnf("value convert to obj failed: %s", err)
 					//	continue
 					//}
 					//s.cache.Store(key, objPtr)
@@ -169,7 +174,7 @@ func (p *Processor) watchPoolEtcd() {
 					if err != nil {
 						return
 					}
-					log.Infof("etcd device data key:%v ,delete...", event.Events[i].Key)
+					log.Sugar.Infof("etcd device data key:%v ,delete...", event.Events[i].Key)
 
 					p.deleteTask(remoteAddr)
 				}
@@ -181,19 +186,19 @@ func (p *Processor) watchPoolEtcd() {
 func (p *Processor) activeStore(guid, val string) error {
 	remoteAddr, err := p.guidStore.Get(context.TODO(), guid)
 	if err != nil {
-		log.Warnf("not found guid:%s Unable to query remoteAddr", guid)
+		log.Sugar.Warnf("not found guid:%s Unable to query remoteAddr", guid)
 		return err
 	}
 	de, err := metaDataCompile(val)
 
 	if err != nil {
-		log.Errorf("guid:%v transfer metadata transform error.", guid)
+		log.Sugar.Errorf("guid:%v transfer metadata transform error.", guid)
 		return err
 	}
 
 	timers, err := p.TimerStore.Get(context.TODO(), remoteAddr)
 	if err != nil {
-		log.Errorf("Unable to get remoteAddr:%s gnet.conn", remoteAddr)
+		log.Sugar.Errorf("Unable to get remoteAddr:%s gnet.conn", remoteAddr)
 		return err
 	}
 	timers.T.Stop()
@@ -248,10 +253,11 @@ func (p *Processor) register(data *model.RegisterData) {
 		if remoteAddr == wt {
 			re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Success)
 			data.Conn.AsyncWrite(re, nil)
-			log.Warnf("remoteAddr:%s alike no need to register again", remoteAddr)
+			log.Sugar.Warnf("remoteAddr:%s alike no need to register again", remoteAddr)
 
 			return
 		} else {
+			log.Sugar.Infof("Already exists connect:%s Forced offline", remoteAddr)
 			p.deleteTask(wt)
 		}
 	}
@@ -263,7 +269,7 @@ func (p *Processor) register(data *model.RegisterData) {
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Error)
 		data.Conn.AsyncWrite(re, nil)
 		data.Conn.Close()
-		log.Warnf("guid:%v metadata not found.", guid)
+		log.Sugar.Warnf("guid:%v metadata not found.", guid)
 		log4j.Printf("guid:%v remoteAddr:%v注册失败，无法查询到元数据", guid, remoteAddr)
 		return
 	}
@@ -274,7 +280,7 @@ func (p *Processor) register(data *model.RegisterData) {
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Success)
 		data.Conn.AsyncWrite(re, nil)
 		if err != nil {
-			log.Errorf("guid:%v transfer metadata transform error.", guid)
+			log.Sugar.Errorf("guid:%v transfer metadata transform error.", guid)
 			return
 		}
 
@@ -320,8 +326,7 @@ func (p *Processor) register(data *model.RegisterData) {
 			p.deviceStore.Create(context.TODO(), remoteAddr, deviceInfo)
 		}
 		device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: de.GuId}
-		log.Infof("register on success,guid:%s remoteAddr:%s", data.D, data.Conn.RemoteAddr())
-		log4j.Printf("guid:%v remoteAddr:%v注册成功🧸", guid, remoteAddr)
+		log.Sugar.Infof("guid:%v remoteAddr:%v注册成功🧸", guid, remoteAddr)
 
 	}
 	return
@@ -331,7 +336,7 @@ func metaDataCompile(val string) (*model.Device, error) {
 	devic := &model.Device{}
 	err := json.Unmarshal([]byte(val), devic)
 	if err != nil {
-		log.Errorf("json unmarshal failed: %s", err)
+		log.Sugar.Errorf("json unmarshal failed: %s", err)
 		return nil, err
 	}
 	return devic, nil

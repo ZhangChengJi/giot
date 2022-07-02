@@ -6,6 +6,7 @@ import (
 	"giot/pkg/log"
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,7 +29,7 @@ func NewSchedulerCommand() *cobra.Command {
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			conf.InitConf()
-			log.InitLogger()
+			zap.ReplaceGlobals(log.New())
 			s := server.NewServer()
 			errSig := make(chan error, 5)
 			s.Start(errSig)
@@ -38,11 +39,11 @@ func NewSchedulerCommand() *cobra.Command {
 
 			select {
 			case sig := <-quit:
-				log.Infof("The Manager API server receive %s and start shutting down", sig.String())
+				log.Sugar.Infof("The Manager API server receive %s and start shutting down", sig.String())
 				s.Stop()
-				log.Infof("See you next time!")
+				log.Sugar.Info("See you next time!")
 			case err := <-errSig:
-				log.Errorf("The Manager API server start failed: %s", err.Error())
+				log.Sugar.Errorf("The Manager API server start failed: %s", zap.Error(err))
 				return err
 			}
 			return nil

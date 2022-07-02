@@ -31,7 +31,7 @@ func (t *DeviceStore) Get(ctx context.Context, key string) (*model.Device, error
 	if tmp, ok := t.cache.Get(key); ok {
 		return tmp.(*model.Device), nil
 	} else {
-		log.Warnf("data not found by key: %s", key)
+		log.Sugar.Warnf("data not found by key: %s", key)
 		return nil, data.ErrNotFound
 	}
 }
@@ -47,7 +47,7 @@ func (t *DeviceStore) Get(ctx context.Context, key string) (*model.Device, error
 //			return a, nil
 //		}
 //	}
-//	log.Warnf("attributeId not found by key: %s", key)
+//	logs.Warnf("attributeId not found by key: %s", key)
 //	return nil, data.ErrNotFound
 //}
 func (t *DeviceStore) Update(ctx context.Context, key string, obj *model.Device) (*model.Device, error) {

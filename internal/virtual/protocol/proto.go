@@ -45,7 +45,7 @@ type ModbusCodec struct {
 func (codec ModbusCodec) Encode(buf []byte) (*modbus.ResultProtocolDataUnit16, error) {
 	data, err := codec.ReadHomeCode(buf) //解码
 	if err != nil {
-		log.Errorf("data Decode failed:%s", err)
+		log.Sugar.Errorf("data Decode failed:%s", err)
 		return nil, err
 	}
 	return data, nil

@@ -8,8 +8,9 @@ import (
 
 func (s *server) setupStore() error {
 	if err := etcd.InitETCDClient(conf.ETCDConfig); err != nil {
-		log.Errorf("init etcd client fail: %w", err)
+		log.Sugar.Errorf("init etcd client fail: %w", err)
 		return err
 	}
+
 	return nil
 }
