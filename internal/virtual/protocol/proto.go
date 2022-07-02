@@ -42,7 +42,7 @@ type ModbusCodec struct {
 }
 
 //加
-func (codec ModbusCodec) Encode(buf []byte) (*modbus.ProtocolDataUnit, error) {
+func (codec ModbusCodec) Encode(buf []byte) (*modbus.ResultProtocolDataUnit16, error) {
 	data, err := codec.ReadHomeCode(buf) //解码
 	if err != nil {
 		log.Errorf("data Decode failed:%s", err)

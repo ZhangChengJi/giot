@@ -11,7 +11,9 @@ import (
 	"giot/pkg/log"
 	"giot/pkg/mqtt"
 	"giot/pkg/tdengine"
+	"math/rand"
 	"os"
+	"strconv"
 
 	"go.uber.org/zap"
 	"net/http"
@@ -54,14 +56,15 @@ func (s *server) init() error {
 	}
 
 	log.Info("Initialize mqtt...")
-	conf.MqttConfig.ClientId = "scheduler"
+	conf.MqttConfig.ClientId = "scheduler" + strconv.Itoa(rand.New(rand.NewSource(time.Now().UnixNano())).Int())
+
 	mq, err := mqtt.New(conf.MqttConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	err = device.Setup(etcd.GenEtcdStorage(), db)
+	err = device.Setup(etcd.GenEtcdStorage(), db, mq)
 	if err != nil {
 		fmt.Println(err)
 		return err

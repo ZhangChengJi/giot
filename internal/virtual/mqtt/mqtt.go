@@ -32,7 +32,7 @@ func InitMqtt(c mqtt.Client) {
 
 // Publish 发布
 func (b *Broker) Publish(topic string, data interface{}) {
-	if token := b.Client.Publish(topic, 2, false, data); token.Wait() && token.Error() != nil {
+	if token := b.Client.Publish(topic, 0, false, data); token.Wait() && token.Error() != nil {
 		fmt.Println(token.Error())
 	}
 }

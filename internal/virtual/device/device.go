@@ -1,6 +1,7 @@
 package device
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"giot/internal/virtual/mqtt"
@@ -55,10 +56,12 @@ func (d *device) listenLoop() {
 
 //发布消息
 func (d *device) Insert(data *DeviceMsg) {
-	topic := append([]byte("device/data/"), data.DeviceId...)
-	fmt.Println(string(topic))
+	var buf bytes.Buffer
+	buf.WriteString("device/data/")
+	buf.WriteString(data.DeviceId)
+	fmt.Println(buf.String())
 	payload, _ := json.Marshal(data)
-	d.Publish(string(topic), payload)
+	d.Publish(buf.String(), payload)
 
 }
 func (d *device) InsertAlarm(data *DeviceMsg) {

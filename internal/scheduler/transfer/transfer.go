@@ -96,7 +96,7 @@ func (t *Transfer) onlineHandler(client mqtt.Client, msg mqtt.Message) {
 func (t *Transfer) online(guid string, slaveId int) {
 	if slaveId == 0 {
 		var pigDevice model.PigDevice
-		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and device_id=?", 0, guid).Update("line_status", 1).Error
+		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and id=?", 0, guid).Update("line_status", 1).Error
 		if err != nil {
 			log.Errorf("online guid:%s update failed", guid)
 			return
@@ -117,13 +117,13 @@ func (t *Transfer) offline(guid string, slaveId int) {
 	var slave model.PigDeviceSlave
 	if slaveId == 0 {
 		var pigDevice model.PigDevice
-		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and device_id=?", 1, guid).Update("line_status", 0).Error
+		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and id=?", 1, guid).Update("line_status", 0).Error
 		if err != nil {
 			log.Errorf("offline guid:%s update failed", guid)
 			return
 		}
 		//fmt.Printf("slave:%v offline", slaveId)
-		//err = t.db.Debug().Model(&slave).Where("device_id=? and line_status=? ", guid, 1).Update("line_status", 0).Error
+		//err = t.db.Debug().Model(&slave).Where("id=? and line_status=? ", guid, 1).Update("line_status", 0).Error
 		//if err != nil {
 		//	log.Errorf("online guid:%s update failed", guid)
 		//	return

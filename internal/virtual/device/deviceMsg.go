@@ -10,21 +10,16 @@ import (
 )
 
 type DeviceMsg struct {
-	Ts       time.Time `json:"timestamp"`
-	DataType string    `json:"dataType"`
-	Level    int       `json:"level"`
-	DeviceId string    `json:"deviceId"`
-	Status   string    `json:"status"`
-	//Name       string    `json:"name" `
-	SlaveId int `json:"slaveId"`
-	//ProductId  string    `json:"productId"`
-	//ModelId    string    `json:"modelId"`
-	//AlarmId    string    `json:"alarmId"`
-	//AlarmLevel int       `json:"alarmLevel"`
-	Data float32 `json:"data"`
-	//NotifyType string    `json:"notifyType"` //通知类型
-	//TemplateId string    `json:"templateId"` //通知模版ID
-	//Actions    []*Action
+	Ts        time.Time `json:"timestamp"`
+	DataType  string    `json:"dataType"`
+	Level     int       `json:"level"`
+	DeviceId  string    `json:"deviceId"`
+	Status    string    `json:"status"`
+	Name      string    `json:"name" `
+	SlaveId   int       `json:"slaveId"`
+	SlaveName string    `json:"slaveName"`
+	Address   string    `json:"address"`
+	Data      uint16    `json:"data"`
 }
 
 // Change max partitions as you need.

@@ -31,7 +31,7 @@ func (PigProduct) TableName() string {
 }
 
 type PigDevice struct {
-	DeviceId         string `gorm:"device_id" json:"device_id"`                 // 设备id
+	Id               string `gorm:"id" json:"id"`                               // 设备id
 	ProductId        int    `gorm:"product_id" json:"product_id"`               // 产品id
 	DeviceName       string `gorm:"device_name" json:"device_name"`             // 设备名称
 	NetworkFlag      int    `gorm:"network_flag" json:"network_flag"`           // 联网方式 1:4G-DTU 1:NB-IOT
@@ -102,10 +102,10 @@ func (PigPropertyAlarm) TableName() string {
 }
 
 type Trigger struct {
-	FilterValue   float32 `json:"filterValue"`   //过滤值
-	LeftValueType int     `json:"leftValueType"` //左侧值
-	Level         int     `json:"level"`         //报警等级
-	Operator      string  `json:"operator"`      //比对条件
+	FilterValue   uint16 `json:"filterValue"`   //过滤值
+	LeftValueType int    `json:"leftValueType"` //左侧值
+	Level         int    `json:"level"`         //报警等级
+	Operator      string `json:"operator"`      //比对条件
 }
 
 type ShakeLimit struct { //防抖
@@ -122,6 +122,7 @@ type Device struct {
 	Name         string `json:"name"`
 	ProductType  int    `json:"productType"`
 	ProductModel string `json:"productModel"`
+	BindStatus   int    `json:"bindStatus"`
 
 	FCode *Ft      `json:"fCode"`
 	Salve []*Slave `json:"salve"`
@@ -343,10 +344,15 @@ func Level(a int) string {
 	return ""
 }
 
+type DeviceChange struct {
+	ChangeType string `json:"changeType"`
+	DeviceId   string `json:"deviceId"`
+}
+
 type Interface interface {
-	AlarmRule(slaveId byte, data float32, fcode uint8, info *Device)
-	Trigger(data float32)
-	Action(guid, status string, level int, data float32, slaveId byte)
+	AlarmRule(slaveId byte, data uint16, fcode uint8, info *Device)
+	Trigger(data uint16)
+	Action(guid, status string, level int, data uint16, slaveId byte)
 }
 
 type Alarm struct {
@@ -354,7 +360,7 @@ type Alarm struct {
 	ShakeLimit *ShakeLimit `json:"shakeLimit"` //防抖动配置
 }
 
-func (engine *Alarm) AlarmRule(slaveId byte, data float32, fcode uint8, info *Device) {
+func (engine *Alarm) AlarmRule(slaveId byte, data uint16, fcode uint8, info *Device) {
 	if info.IsType() {
 		switch data { //是否工业产品
 		// 10000     探测器内部错误
@@ -404,7 +410,7 @@ func (engine *Alarm) AlarmRule(slaveId byte, data float32, fcode uint8, info *De
 	}
 }
 
-func (engine *Alarm) Trigger(slaveId byte, data float32, info *Device) {
+func (engine *Alarm) Trigger(slaveId byte, data uint16, info *Device) {
 
 	for _, trigger := range engine.Triggers { //循环告警触发条件
 
@@ -444,7 +450,7 @@ func (engine *Alarm) Trigger(slaveId byte, data float32, info *Device) {
 	engine.Action(info.GuId, consts.DATA, consts.Normal, data, slaveId)
 }
 
-func (engine *Alarm) Action(guid, status string, level int, data float32, slaveId byte) {
+func (engine *Alarm) Action(guid, status string, level int, data uint16, slaveId byte) {
 
 	device.DataChan <- &device.DeviceMsg{
 		Ts:       time.Now(),

@@ -54,6 +54,7 @@ func (t *LineTimer) Execute() {
 		} else {
 			fmt.Printf("时间:%v----->slave:%v上⬆️线\n", time.Now().Format("2006-01-02 15:04:05"), slave.SlaveId)
 			if slave.LineStatus == "" || slave.LineStatus == consts.OFFLINE { //如果之前有下线的现在变为上线
+				fmt.Println("进入。。。。。")
 				slave.LineStatus = consts.ONLINE
 				device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: t.Guid, SlaveId: int(slave.SlaveId)}
 			}

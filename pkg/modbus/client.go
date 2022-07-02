@@ -6,6 +6,27 @@ import (
 	"fmt"
 )
 
+type RegType uint
+type Endianness uint
+type WordOrder uint
+
+const (
+	PARITY_NONE uint = 0
+	PARITY_EVEN uint = 1
+	PARITY_ODD  uint = 2
+
+	HOLDING_REGISTER RegType = 0
+	INPUT_REGISTER   RegType = 1
+
+	// endianness of 16-bit registers
+	BIG_ENDIAN    Endianness = 1
+	LITTLE_ENDIAN Endianness = 2
+
+	// word order of 32-bit registers
+	HIGH_WORD_FIRST WordOrder = 1
+	LOW_WORD_FIRST  WordOrder = 2
+)
+
 type client struct {
 	rtuHandler *RtuHandler
 }
@@ -55,10 +76,10 @@ func (c *client) WriteSingleRegister(slaveId byte, address, quantity uint16, val
 	}
 	return c.rtuHandler.Encode(&request)
 }
-func (c *client) ReadIndustryCode(data []byte) (pdu *ProtocolDataUnit, err error) {
+func (c *client) ReadIndustryCode(data []byte) (result *ResultProtocolDataUnit16, err error) {
 	return c.rtuHandler.Decode(data)
 }
-func (c *client) ReadHomeCode(data []byte) (pdu *ProtocolDataUnit, err error) {
+func (c *client) ReadHomeCode(data []byte) (pdu *ResultProtocolDataUnit16, err error) {
 	return c.rtuHandler.HomeDecode(data)
 }
 
@@ -77,6 +98,8 @@ func (c *client) WriteMultipleRegisters(address, quantity uint16, value []byte) 
 		err = fmt.Errorf("modbus: quantity '%v' must be between '%v' and '%v',", quantity, 1, 123)
 		return
 	}
+	a := bytesToFloat32s(BIG_ENDIAN, HIGH_WORD_FIRST, dataBlockSuffix(value, address, quantity))
+	fmt.Println(a)
 	request := ProtocolDataUnit{
 		FunctionCode: FuncCodeWriteMultipleRegisters,
 		Data:         dataBlockSuffix(value, address, quantity),
@@ -113,6 +136,7 @@ func (mb *RtuHandler) Encode(pdu *ProtocolDataUnit) (adu []byte, err error) {
 
 	adu[length-1] = byte(checksum >> 8)
 	adu[length-2] = byte(checksum)
+
 	return
 }
 
@@ -144,10 +168,11 @@ func readHex(data []byte) (value byte, err error) {
 }
 
 // Decode extracts PDU from RTU frame and verify CRC. Decode 解码
-func (mb *RtuHandler) Decode(adu []byte) (pdu *ProtocolDataUnit, err error) {
+func (mb *RtuHandler) Decode(adu []byte) (result *ResultProtocolDataUnit16, err error) {
 	length := len(adu)
 	// Calculate checksum
 	var crc crc
+
 	crc.reset().pushBytes(adu[0 : length-2])
 	checksum := uint16(adu[length-1])<<8 | uint16(adu[length-2])
 	if checksum != crc.value() {
@@ -155,18 +180,17 @@ func (mb *RtuHandler) Decode(adu []byte) (pdu *ProtocolDataUnit, err error) {
 		return
 	}
 	// Function code & data
-	pdu = &ProtocolDataUnit{}
-	pdu.SaveId = adu[0]       //从机id
-	pdu.FunctionCode = adu[1] //功能码
+	result = &ResultProtocolDataUnit16{}
+	result.SaveId = adu[0]       //从机id
+	result.FunctionCode = adu[1] //功能码
 
-	pdu.Data = adu[3 : len(adu)-2] //数据
-
+	result.Data = bytesToUint16(BIG_ENDIAN, adu[3:len(adu)-2]) //数据
 	return
 }
 
 var homeCode = [...]byte{0x70, 0x65, 0x66, 0x63, 0x64}
 
-func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ProtocolDataUnit, err error) {
+func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataUnit16, err error) {
 	length := len(adu)
 	// Calculate checksum
 	var crc crc
@@ -177,7 +201,7 @@ func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ProtocolDataUnit, err error) 
 		return
 	}
 	// Function code & data
-	pdu = &ProtocolDataUnit{}
+	pdu = &ResultProtocolDataUnit16{}
 	pdu.SaveId = adu[0] //从机id
 	for _, b := range homeCode {
 		if b == adu[1] {
@@ -186,7 +210,7 @@ func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ProtocolDataUnit, err error) 
 		}
 	}
 
-	pdu.Data = adu[24:32] //数据
+	pdu.Data = bytesToUint16(BIG_ENDIAN, adu[24:32]) //数据
 
 	return
 }
@@ -223,48 +247,10 @@ func dataBlockSuffix(suffix []byte, value ...uint16) []byte {
 	return data
 }
 
-func responseError(response *ProtocolDataUnit) error {
-	mbError := &ModbusError{FunctionCode: response.FunctionCode}
-	if response.Data != nil && len(response.Data) > 0 {
-		mbError.ExceptionCode = response.Data[0]
-	}
-	return mbError
-}
-func uint16ToBytes(endianness Endianness, in uint16) (out []byte) {
-	out = make([]byte, 2)
-	switch endianness {
-	case BIG_ENDIAN:
-		binary.BigEndian.PutUint16(out, in)
-	case LITTLE_ENDIAN:
-		binary.LittleEndian.PutUint16(out, in)
-	}
-
-	return
-}
-
-func uint16sToBytes(endianness Endianness, in []uint16) (out []byte) {
-	for i := range in {
-		out = append(out, uint16ToBytes(endianness, in[i])...)
-	}
-
-	return
-}
-
-func bytesToUint16(endianness Endianness, in []byte) (out uint16) {
-	switch endianness {
-	case BIG_ENDIAN:
-		out = binary.BigEndian.Uint16(in)
-	case LITTLE_ENDIAN:
-		out = binary.LittleEndian.Uint16(in)
-	}
-
-	return
-}
-
-func bytesToUint16s(endianness Endianness, in []byte) (out []uint16) {
-	for i := 0; i < len(in); i += 2 {
-		out = append(out, bytesToUint16(endianness, in[i:i+2]))
-	}
-
-	return
-}
+//func responseError(response *ProtocolDataUnit) error {
+//	mbError := &ModbusError{FunctionCode: response.FunctionCode}
+//	if response.Data != nil && len(response.Data) > 0 {
+//		mbError.ExceptionCode = response.Data[0]
+//	}
+//	return mbError
+//}

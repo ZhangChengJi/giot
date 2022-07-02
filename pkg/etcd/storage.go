@@ -23,6 +23,7 @@ type Interface interface {
 	List(ctx context.Context, key string) ([]Keypair, error)
 	Create(ctx context.Context, key, val string) error
 	Update(ctx context.Context, key, val string) error
+	Delete(ctx context.Context, keys string) error
 	BatchDelete(ctx context.Context, keys []string) error
 	Watch(ctx context.Context, key string) <-chan WatchResponse
 }

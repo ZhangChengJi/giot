@@ -8,6 +8,12 @@ var (
 )
 
 const (
+	Update = "update"
+	Add    = "add"
+	Delete = "delete"
+)
+
+const (
 	Normal        = iota //正常
 	High                 //高报警
 	Low                  //低报警

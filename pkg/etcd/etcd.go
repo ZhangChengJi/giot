@@ -195,7 +195,21 @@ func (s *EtcdV3Storage) Update(ctx context.Context, key, val string) error {
 	}
 	return nil
 }
+func (s *EtcdV3Storage) Delete(ctx context.Context, keys string) error {
 
+	key := path.Join(s.pathPrefix, keys)
+	resp, err := s.client.Delete(ctx, key)
+	if err != nil {
+		log.Errorf("delete etcd key[%s] failed: %s", key, err)
+		return fmt.Errorf("delete etcd key[%s] failed: %s", keys, err)
+	}
+	if resp.Deleted == 0 {
+		log.Warnf("key: %s is not found", key)
+		return fmt.Errorf("key: %s is not found", keys)
+	}
+
+	return nil
+}
 func (s *EtcdV3Storage) BatchDelete(ctx context.Context, keys []string) error {
 
 	for i := range keys {

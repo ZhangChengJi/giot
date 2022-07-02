@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"giot/internal/model"
 	"giot/pkg/etcd"
 	"giot/pkg/log"
 	"giot/pkg/modbus"
+	"giot/utils/consts"
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"gorm.io/gorm"
 	"reflect"
 	"time"
@@ -20,7 +23,8 @@ var (
 	DEVICE_PASSIVE = 2 //服务器采集
 	F03H           = 3 //03功能
 	F04H           = 4 //04功能
-
+	TIMER10_SECOND = 10 * time.Second
+	TIMER20_SECOND = 20 * time.Second
 	TIMER30_SECOND = 30 * time.Second
 	TIMER60_SECOND = 60 * time.Second
 	//指令下发方式 1:单条下发 2:多条下发',
@@ -32,18 +36,85 @@ type Device struct {
 	modbuls modbus.Client
 	etcd    etcd.Interface
 	db      *gorm.DB
+	mqtt    mqtt.Client
 }
 
-func Setup(Etcd etcd.Interface, Db *gorm.DB) error {
+func Setup(Etcd etcd.Interface, Db *gorm.DB, mqtt mqtt.Client) error {
 	device := &Device{
 		modbuls: modbus.NewClient(&modbus.RtuHandler{}),
 		etcd:    Etcd,
 		db:      Db,
+		mqtt:    mqtt,
 	}
-	return device.deviceLoad()
+	err := device.deviceLoad()
+	if err != nil {
+		return err
+	}
+	go device.DeviceLister()
+	return err
 
 }
+func (device *Device) DeviceLister() error {
+	if token := device.mqtt.Subscribe("device/change", 0, func(client mqtt.Client, message mqtt.Message) {
+		var changeData model.DeviceChange
+		err := json.Unmarshal(message.Payload(), &changeData)
+		if err != nil {
+			log.Error("topic：'device/change' deviceData failed:%s", err)
+			return
+		}
+		if changeData.ChangeType == consts.Update || changeData.ChangeType == consts.Add {
+			var de model.PigDevice
+			err := device.db.Where(&model.PigDevice{Id: changeData.DeviceId}).First(&de).Error
+			if err != nil {
+				return
+			}
+			var product model.PigProduct
+			err = device.db.Where(&model.PigProduct{Id: de.ProductId}).First(&product).Error
+			if err != nil {
+				return
+			}
+			var instruct bool
+			ta := &model.TimerActive{Guid: de.Id}
+			if de.InstructFlag == INSTRUCT_ONE {
+				instruct = true
+			}
+			slaves, err := device.getSalve(de.Id, ta, instruct)
+			if err != nil {
+				return
+			}
+			devic := &model.Device{
+				GuId:        de.Id,
+				Name:        de.DeviceName,
+				ProductType: product.ProductType,
+				FCode:       ta.Ft,
+				Salve:       slaves,
+				BindStatus:  de.BindStatus,
+			}
+			if !reflect.DeepEqual(devic, model.Device{}) { //etcd device
+				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+				data, _ := json.Marshal(devic)
+				err := device.etcd.Create(ctx, "device/"+ta.Guid, string(data))
+				cancel()
+				if err != nil {
+					return
+				}
+			}
 
+		}
+		if changeData.ChangeType == consts.Delete {
+			if err = device.etcd.Delete(context.TODO(), "device/"+changeData.DeviceId); err != nil {
+				log.Error("delete etcd deivceId :%v", changeData.DeviceId)
+			}
+
+		}
+	}); token.Wait() && token.Error() != nil {
+		fmt.Println(token.Error())
+		log.Error("subscribe topic:%s failed", "device/change")
+		return token.Error()
+
+	}
+	return nil
+}
 func (device *Device) deviceLoad() error {
 	log.Info("Initialize device load.....")
 	size := 10
@@ -70,20 +141,21 @@ func (device *Device) deviceLoad() error {
 				return err
 			}
 			var instruct bool
-			ta := &model.TimerActive{Guid: d.DeviceId}
+			ta := &model.TimerActive{Guid: d.Id}
 			if d.InstructFlag == INSTRUCT_ONE {
 				instruct = true
 			}
-			slaves, err := device.getSalve(d.DeviceId, ta, instruct)
+			slaves, err := device.getSalve(d.Id, ta, instruct)
 			if err != nil {
 				return err
 			}
 			devic := &model.Device{
-				GuId:        d.DeviceId,
+				GuId:        d.Id,
 				Name:        d.DeviceName,
 				ProductType: product.ProductType,
 				FCode:       ta.Ft,
 				Salve:       slaves,
+				BindStatus:  d.BindStatus,
 			}
 			if !reflect.DeepEqual(devic, model.Device{}) { //etcd device
 				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
@@ -175,7 +247,7 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 // createActive  创建动态指令
 func (device *Device) createActive(ta *model.TimerActive, code, salveId int, propertyRegister int) error {
 	tc := &tCode{}
-	err := tc.crateTimerCode(TIMER30_SECOND, ta).functionCode(code, device.modbuls, byte(salveId), uint16(propertyRegister))
+	err := tc.crateTimerCode(TIMER10_SECOND, ta).functionCode(code, device.modbuls, byte(salveId), uint16(propertyRegister))
 	if err != nil {
 		return err
 	}

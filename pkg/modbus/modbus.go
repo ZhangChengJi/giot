@@ -46,14 +46,6 @@ const (
 	rtuExceptionSize = 5
 )
 
-type Endianness uint
-
-const (
-	// endianness of 16-bit registers
-	BIG_ENDIAN    Endianness = 1
-	LITTLE_ENDIAN Endianness = 2
-)
-
 var (
 	Success = []byte{0x0, 0x1}
 	Error   = []byte{0x0, 0x0}
@@ -98,6 +90,11 @@ type ProtocolDataUnit struct {
 	SaveId       byte   //从机地址
 	FunctionCode byte   //功能码
 	Data         []byte //内容
+}
+type ResultProtocolDataUnit16 struct {
+	SaveId       uint8  //从机地址
+	FunctionCode uint8  //功能码
+	Data         uint16 //内容
 }
 
 // Packager specifies the communication layer.

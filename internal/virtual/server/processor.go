@@ -11,7 +11,7 @@ import (
 	"giot/internal/virtual/wheelTimer"
 	"giot/pkg/etcd"
 	"giot/pkg/log"
-	modbus2 "giot/pkg/modbus"
+	"giot/pkg/modbus"
 	"giot/utils/consts"
 	"giot/utils/runtime"
 	"github.com/RussellLuo/timingwheel"
@@ -22,7 +22,7 @@ import (
 )
 
 type Processor struct {
-	modbus      modbus2.Client
+	modbus      modbus.Client
 	Stg         etcd.Interface
 	Timer       *timingwheel.TimingWheel
 	TimerStore  store.DeviceTimerIn
@@ -34,7 +34,7 @@ type Processor struct {
 }
 
 func NewProcessor() *Processor {
-	processor := &Processor{modbus: modbus2.NewClient(&modbus2.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Timer: wheelTimer.NewTimer(), TimerStore: store.NewTimerStore(), LineStore: lineTimer.NewLineStore(), guidStore: store.NewGuidStore(), slaveStore: store.NewSlaveStore(), deviceStore: store.NewDeviceStore(), workerPool: goroutine.Default()}
+	processor := &Processor{modbus: modbus.NewClient(&modbus.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Timer: wheelTimer.NewTimer(), TimerStore: store.NewTimerStore(), LineStore: lineTimer.NewLineStore(), guidStore: store.NewGuidStore(), slaveStore: store.NewSlaveStore(), deviceStore: store.NewDeviceStore(), workerPool: goroutine.Default()}
 	go processor.watchPoolEtcd()
 	return processor
 
@@ -71,23 +71,23 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 		case data := <-da:
 			info, err := p.deviceStore.Get(context.TODO(), data.RemoteAddr)
 			if err == nil && info != nil {
-				var pdu *modbus2.ProtocolDataUnit
+				var result *modbus.ResultProtocolDataUnit16
 				if info.IsType() {
-					pdu, err = p.modbus.ReadIndustryCode(data.Frame) //解码
+					result, err = p.modbus.ReadIndustryCode(data.Frame) //解码
 				} else {
-					pdu, err = p.modbus.ReadHomeCode(data.Frame) //解码
+					result, err = p.modbus.ReadHomeCode(data.Frame) //解码
 				}
 				if err == nil {
-					if slave, err := p.slaveStore.GetSlave(context.TODO(), data.RemoteAddr, pdu.SaveId); err == nil { //获取属性ID
+					if slave, err := p.slaveStore.GetSlave(context.TODO(), data.RemoteAddr, result.SaveId); err == nil { //获取属性ID
 						slave.DataTime = time.Now()
 						if slave.LineStatus == "" || slave.LineStatus == consts.OFFLINE {
 							fmt.Printf("时间:%v----->slave:%v上⬆️线\n", time.Now().Format("2006-01-02 15:04:05"), slave.SlaveId)
 							slave.LineStatus = consts.ONLINE
 							device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: info.GuId, SlaveId: int(slave.SlaveId)}
 						}
-						slave.Alarm.AlarmRule(slave.SlaveId, ByteToFloat32(pdu.Data), pdu.FunctionCode, info)
+						slave.Alarm.AlarmRule(slave.SlaveId, result.Data, result.FunctionCode, info)
 					} else {
-						log.Errorf("salve:%s not found", pdu.SaveId)
+						log.Errorf("salve:%s not found", result.SaveId)
 					}
 				}
 			}
@@ -98,10 +98,6 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 
 }
 
-func ByteToFloat32(bytes []byte) float32 {
-	b2 := bytes[1]
-	return float32(b2)
-}
 func (p *Processor) ListenCommand(msg chan *model.ListenMsg) {
 	for {
 		select {
@@ -250,11 +246,13 @@ func (p *Processor) register(data *model.RegisterData) {
 	//
 	if wt, err := p.guidStore.Get(context.TODO(), data.D); err == nil {
 		if remoteAddr == wt {
-			re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Success)
+			re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Success)
 			data.Conn.AsyncWrite(re, nil)
 			log.Warnf("remoteAddr:%s alike no need to register again", remoteAddr)
 
 			return
+		} else {
+			p.deleteTask(wt)
 		}
 	}
 	//没有注册过就etcd查询
@@ -262,7 +260,7 @@ func (p *Processor) register(data *model.RegisterData) {
 	guid := string(data.D)
 	val, err := p.Stg.Get(context.Background(), "device/"+guid)
 	if err != nil {
-		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Error)
+		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Error)
 		data.Conn.AsyncWrite(re, nil)
 		data.Conn.Close()
 		log.Warnf("guid:%v metadata not found.", guid)
@@ -273,7 +271,7 @@ func (p *Processor) register(data *model.RegisterData) {
 	//3. 认证成功开始配置元数据信息
 	if len(val) > 0 {
 		de, err := metaDataCompile(val)
-		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus2.Success)
+		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Success)
 		data.Conn.AsyncWrite(re, nil)
 		if err != nil {
 			log.Errorf("guid:%v transfer metadata transform error.", guid)
