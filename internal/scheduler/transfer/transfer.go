@@ -1,24 +1,19 @@
 package transfer
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	"giot/internal/virtual/device"
-	"giot/utils"
-	"giot/utils/json"
-	"golang.org/x/text/message"
-	"runtime"
-	"strconv"
-
 	"giot/internal/model"
-	"giot/internal/notify"
-	"giot/internal/notify/sms"
+	"giot/internal/virtual/device"
 	"giot/pkg/log"
 	"giot/pkg/queue"
+	"giot/utils"
 	"giot/utils/consts"
+	"giot/utils/json"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"golang.org/x/text/message"
 	"gorm.io/gorm"
+	"runtime"
 	"time"
 )
 
@@ -30,7 +25,6 @@ type Transfer struct {
 	db        *gorm.DB
 	dataChan  chan []byte
 	alarmChan chan *device.DeviceMsg
-	notifier  *notify.Notify
 	queue     *queue.Queue
 }
 
@@ -40,7 +34,6 @@ func Setup(mqtt mqtt.Client, tdengine *sql.DB, mysql *gorm.DB) {
 		td:        tdengine,
 		db:        mysql,
 		alarmChan: make(chan *device.DeviceMsg, 1024),
-		notifier:  notify.New(),
 		queue:     queue.NewWithOption(queue.DefaultOption()),
 	}
 	t.consume(t.queue, 4, t.td)
@@ -167,72 +160,4 @@ func (t *Transfer) consume(q *queue.Queue, workers int, taos *sql.DB) {
 			}
 		}(q)
 	}
-}
-
-func (t *Transfer) notifyProvider(action string, metadata *notify.Metadata) {
-
-	switch action {
-	case consts.SMS:
-		sms := sms.New(metadata.AccessKeyId, metadata.Secret)
-		sms.AddReceivers(metadata.Sms.PhoneNumber)
-		t.notifier.UseServices(sms)
-		t.notifier.Send(context.Background(), metadata.Sms.SignName, metadata.Sms.Code, metadata.Sms.Param) //TODO 是否记录发送状态
-	case consts.VOICE:
-
-	}
-}
-
-//func (t *Transfer) notifyLoop() {
-//	for {
-//		select {
-//		case alarm := <-t.alarmChan:
-//			for _, action := range alarm.Actions {
-//				metadata, err := t.queryNotifyMetadata(action.NotifierId, action.TemplateId, action.NotifyType, alarm.Name, alarm.SlaveId, alarm.AlarmLevel)
-//				if err != nil {
-//					log.Errorf("query notify metadata failed")
-//					return
-//				}
-//				t.notifyProvider(action.NotifyType, metadata)
-//			}
-//		case <-time.After(300 * time.Millisecond):
-//
-//		}
-//	}
-//}
-
-func (t *Transfer) queryNotifyMetadata(cid, tid, notifyType, name string, slaveId int, level int) (*notify.Metadata, error) {
-	var config model.NotifyConfig
-	err := t.db.First(&config, cid).Error
-	if err != nil {
-		return nil, err
-	}
-	var metadata notify.Metadata
-	err = json.Unmarshal([]byte(config.Configuration), &metadata)
-	if err != nil {
-		return nil, err
-	}
-	var template model.NotifyTemplate
-	err = t.db.First(&template, tid).Error
-	if err != nil {
-		return nil, err
-	}
-	switch notifyType {
-	case consts.SMS:
-		pa := &sms.Template{Devname: name, Devid: strconv.Itoa(slaveId), Alarmtype: model.Level(level)}
-		param, _ := json.Marshal(pa)
-		err = json.Unmarshal([]byte(template.Template), &metadata.Sms)
-		if err != nil {
-			return nil, err
-		}
-		metadata.Sms.Param = string(param)
-		break
-	case consts.VOICE:
-		err = json.Unmarshal([]byte(template.Template), &metadata.Voice)
-		if err != nil {
-			return nil, err
-		}
-		break
-	}
-
-	return &metadata, nil
 }

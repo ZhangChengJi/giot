@@ -49,7 +49,7 @@ func (d *device) listenLoop() {
 		case data := <-OnlineChan:
 			d.Online(data)
 			fmt.Println("我是上下线数据", data.Status)
-		case <-time.After(300 * time.Millisecond):
+		case <-time.After(200 * time.Millisecond):
 		}
 	}
 }
