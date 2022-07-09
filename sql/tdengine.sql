@@ -21,7 +21,7 @@ USE dory_device;
 -- 创建正常上数超级表    字段：时间戳、数据、状态。 标签：产品ID、设备ID、属性ID、从机ID、
 CREATE STABLE if not exists dory_device.device_data  (ts timestamp,gas float, status bool) TAGS(product_id binary(30), device_id binary(30),slave int,model_id binary(30));
 
-CREATE STABLE if not exists dory_device.device_data  (ts timestamp,gas float) TAGS( device_id binary(30),slave int);
+CREATE STABLE if not exists dory_device.device_data  (ts timestamp,data float,level int) TAGS( device_id binary(30),slave_id int);
 
 
 --根据超级表创建子表

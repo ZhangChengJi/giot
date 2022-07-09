@@ -12,4 +12,6 @@ type Client interface {
 
 	ReadIndustryCode(data []byte) (result *ResultProtocolDataUnit16, err error)
 	ReadHomeCode(data []byte) (result *ResultProtocolDataUnit16, err error)
+
+	CheckCrc(data []byte) (err error)
 }

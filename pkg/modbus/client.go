@@ -107,6 +107,19 @@ func (c *client) WriteMultipleRegisters(address, quantity uint16, value []byte) 
 	ad, _ := c.rtuHandler.Encode(&request)
 	return ad, nil
 }
+func (c *client) CheckCrc(data []byte) (err error) {
+	length := len(data)
+	var crc crc
+
+	crc.reset().pushBytes(data[0 : length-2])
+	checksum := uint16(data[length-1])<<8 | uint16(data[length-2])
+	if checksum != crc.value() {
+		err = fmt.Errorf("modbus: response crc '%v' does not match expected '%v'", checksum, crc.value())
+		return err
+	}
+	return nil
+
+}
 
 type RtuHandler struct {
 	SlaveId byte

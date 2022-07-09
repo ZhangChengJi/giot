@@ -105,7 +105,7 @@ func (PigPropertyAlarm) TableName() string {
 
 type Trigger struct {
 	FilterValue   uint16 `json:"filterValue"`   //过滤值
-	LeftValueType int    `json:"leftValueType"` //左侧值
+	LeftValueType string `json:"leftValueType"` //左侧值
 	Level         int    `json:"level"`         //报警等级
 	Operator      string `json:"operator"`      //比对条件
 }

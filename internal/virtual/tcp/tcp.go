@@ -39,9 +39,10 @@ func (ps *TcpServer) OnClose(c gnet.Conn, err error) (action gnet.Action) {
 }
 func (ps *TcpServer) OnTraffic(c gnet.Conn) gnet.Action {
 	data, _ := c.Next(-1)
+
 	length := len(data)
-	if length > 0 && length >= 7 && length < 44 {
-		if length == 24 { //注册
+	if length > 0 && length >= 7 && length <= 44 {
+		if length == 24 || length == 44 { //注册
 			re := &model.RegisterData{Conn: c, D: strings.Trim(string(data), "\r")}
 			ps.RegisterChan <- re
 		} else { //上数

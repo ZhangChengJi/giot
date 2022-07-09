@@ -36,6 +36,7 @@ type Processor struct {
 func NewProcessor() *Processor {
 	processor := &Processor{modbus: modbus.NewClient(&modbus.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Timer: wheelTimer.NewTimer(), TimerStore: store.NewTimerStore(), LineStore: lineTimer.NewLineStore(), guidStore: store.NewGuidStore(), slaveStore: store.NewSlaveStore(), deviceStore: store.NewDeviceStore(), workerPool: goroutine.Default()}
 	go processor.watchPoolEtcd()
+	go processor.debug()
 	return processor
 
 }
@@ -331,7 +332,22 @@ func (p *Processor) register(data *model.RegisterData) {
 	}
 	return
 }
+func (p *Processor) debug() {
+	for {
+		select {
+		case de := <-device.DebugChan:
+			addr, err := p.guidStore.Get(context.TODO(), de.Guid)
+			if err == nil {
+				if we, err := p.TimerStore.Get(context.TODO(), addr); err == nil {
+					log.Sugar.Infof("debug指令下发：%v", de.FCode)
+					we.Conn.AsyncWrite(de.FCode, nil)
+				}
+			}
 
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+}
 func metaDataCompile(val string) (*model.Device, error) {
 	devic := &model.Device{}
 	err := json.Unmarshal([]byte(val), devic)

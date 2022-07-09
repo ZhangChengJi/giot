@@ -15,14 +15,14 @@ const (
 
 const (
 	Normal        = iota //正常
-	High                 //高报警
-	Low                  //低报警
+	High                 //高报
+	Low                  //低报
 	Internal             //探测器内部错误
 	Communication        //通讯错误
 	Shield               //主机屏蔽探测器
 	SlaveHitch           //探头故障
-	LowHitch             //家报传感器低故障报警
-	HighHitch            //家报传感器高故障报警
+	LowHitch             //家报传感器低故障
+	HighHitch            //家报传感器高故障
 	Life                 //家报寿命
 	DATA          = "data"
 	ALARM         = "alarm"

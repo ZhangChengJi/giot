@@ -82,7 +82,7 @@ func (r DeviceMsg) TaosValues() []interface{} {
 	var values []interface{}
 	values = append(values, r.Ts)
 	if r.DataType == consts.DATA {
-		values = append(values, r.Data)
+		values = append(values, r.Data, r.Level)
 	} else {
 		values = append(values, r.Data, r.Level)
 	}

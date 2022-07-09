@@ -31,8 +31,9 @@ type Interface interface {
 func (t *SyncTimer) Execute() {
 	for _, v := range t.Directives {
 		fmt.Printf("时间:%v——--->任务下发:%X\n", time.Now().Format("2006-01-02 15:04:05"), v)
-		time.Sleep(300 * time.Millisecond)
+
 		t.Conn.AsyncWrite(v, nil)
+		time.Sleep(300 * time.Millisecond)
 	}
 }
 
