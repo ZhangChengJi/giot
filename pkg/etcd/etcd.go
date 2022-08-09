@@ -210,6 +210,21 @@ func (s *EtcdV3Storage) Delete(ctx context.Context, keys string) error {
 
 	return nil
 }
+func (s *EtcdV3Storage) DeleteWithPrefix(ctx context.Context, keys string) error {
+
+	key := path.Join(s.pathPrefix, keys)
+	resp, err := s.client.Delete(ctx, key, clientv3.WithPrefix())
+	if err != nil {
+		log.Sugar.Errorf("delete etcd key[%s] failed: %s", key, err)
+		return fmt.Errorf("delete etcd key[%s] failed: %s", keys, err)
+	}
+	if resp.Deleted == 0 {
+		log.Sugar.Warnf("key: %s is not found", key)
+		return fmt.Errorf("key: %s is not found", keys)
+	}
+
+	return nil
+}
 func (s *EtcdV3Storage) BatchDelete(ctx context.Context, keys []string) error {
 
 	for i := range keys {

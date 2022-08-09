@@ -25,6 +25,7 @@ type Interface interface {
 	Update(ctx context.Context, key, val string) error
 	Delete(ctx context.Context, keys string) error
 	BatchDelete(ctx context.Context, keys []string) error
+	DeleteWithPrefix(ctx context.Context, keys string) error
 	Watch(ctx context.Context, key string) <-chan WatchResponse
 }
 
