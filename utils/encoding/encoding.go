@@ -1,8 +1,29 @@
-package modbus
+package encoding
 
 import (
 	"encoding/binary"
 	"math"
+)
+
+type RegType uint
+type Endianness uint
+type WordOrder uint
+
+const (
+	PARITY_NONE uint = 0
+	PARITY_EVEN uint = 1
+	PARITY_ODD  uint = 2
+
+	HOLDING_REGISTER RegType = 0
+	INPUT_REGISTER   RegType = 1
+
+	// endianness of 16-bit registers
+	BIG_ENDIAN    Endianness = 1
+	LITTLE_ENDIAN Endianness = 2
+
+	// word order of 32-bit registers
+	HIGH_WORD_FIRST WordOrder = 1
+	LOW_WORD_FIRST  WordOrder = 2
 )
 
 func uint16ToBytes(endianness Endianness, in uint16) (out []byte) {
@@ -25,10 +46,11 @@ func uint16sToBytes(endianness Endianness, in []uint16) (out []byte) {
 	return
 }
 
-func bytesToUint16(endianness Endianness, in []byte) (out uint16) {
+func BytesToUint16(endianness Endianness, in []byte) (out uint16) {
 	switch endianness {
 	case BIG_ENDIAN:
 		out = binary.BigEndian.Uint16(in)
+
 	case LITTLE_ENDIAN:
 		out = binary.LittleEndian.Uint16(in)
 	}
@@ -38,7 +60,7 @@ func bytesToUint16(endianness Endianness, in []byte) (out uint16) {
 
 func bytesToUint16s(endianness Endianness, in []byte) (out []uint16) {
 	for i := 0; i < len(in); i += 2 {
-		out = append(out, bytesToUint16(endianness, in[i:i+2]))
+		out = append(out, BytesToUint16(endianness, in[i:i+2]))
 	}
 
 	return
@@ -94,7 +116,7 @@ func uint32ToBytes(endianness Endianness, wordOrder WordOrder, in uint32) (out [
 	return
 }
 
-func bytesToFloat32s(endianness Endianness, wordOrder WordOrder, in []byte) (out []float32) {
+func BytesToFloat32s(endianness Endianness, wordOrder WordOrder, in []byte) (out []float32) {
 	var u32s []uint32
 
 	u32s = bytesToUint32s(endianness, wordOrder, in)

@@ -37,10 +37,10 @@ func New(conf *conf.Mqtt) (mqtt.Client, error) {
 }
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	fmt.Println("mqtt连接成功...\n")
+	//log.Sugar.Infof("mqtt连接成功...\n")
 }
 
 // 连接丢失的回调
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Printf("mqtt连接丢失: %v\n", err.Error())
+	log.Sugar.Errorf("mqtt连接丢失: %v\n", err.Error())
 }

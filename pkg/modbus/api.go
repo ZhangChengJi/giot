@@ -10,8 +10,9 @@ type Client interface {
 	WriteSingleRegister(slaveId byte, address, quantity uint16, value []byte) (results []byte, err error)
 	WriteMultipleRegisters(address, quantity uint16, value []byte) (results []byte, err error)
 
-	ReadIndustryCode(data []byte) (result *ResultProtocolDataUnit16, err error)
-	ReadHomeCode(data []byte) (result *ResultProtocolDataUnit16, err error)
+	ReadIndustryCode(data []byte) (result *ResultProtocolDataStr, err error)
+	ReadIndustryF1Code(data []byte) (result []*ProtocolDataUnit, err error)
+	ReadHomeCode(data []byte) (result *ResultProtocolDataStr, err error)
 
 	CheckCrc(data []byte) (err error)
 }

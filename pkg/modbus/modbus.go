@@ -87,14 +87,15 @@ func (e *ModbusError) Error() string {
 
 // ProtocolDataUnit (PDU) is independent of underlying communication layers.
 type ProtocolDataUnit struct {
-	SaveId       byte   //从机地址
+	SlaveId      byte   //从机地址
 	FunctionCode byte   //功能码
 	Data         []byte //内容
 }
-type ResultProtocolDataUnit16 struct {
-	SaveId       uint8  //从机地址
+type ResultProtocolDataStr struct {
+	SlaveId      uint8  //从机地址
 	FunctionCode uint8  //功能码
-	Data         uint16 //内容
+	Data         string //内容
+	DataType     []byte //数据浮点
 }
 
 // Packager specifies the communication layer.

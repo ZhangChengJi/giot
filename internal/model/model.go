@@ -1,9 +1,14 @@
 package model
 
 import (
+	"fmt"
 	"giot/internal/virtual/device"
 	"giot/utils/consts"
+	"giot/utils/encoding"
 	"github.com/panjf2000/gnet/v2"
+	"github.com/shopspring/decimal"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -43,7 +48,7 @@ type PigDevice struct {
 	LineStatus       int    `gorm:"line_status" json:"line_status"`             // 设备状态: 0:离线 1:在线
 	DeviceAddress    string `gorm:"device_address" json:"device_address"`       // 设备地址
 	DeviceCoordinate string `gorm:"device_coordinate" json:"device_coordinate"` // 设备坐标信息
-	BindGroup        int    `gorm:"bind_group" json:"bind_group"`               // 绑定分组id
+	GroupId          int    `gorm:"group_id" json:"group_id"`                   //分组id
 
 }
 
@@ -78,6 +83,7 @@ type PigProperty struct {
 	PropertyName           string `gorm:"property_name" json:"property_name"`                     // 属性名称
 	PropertyIdentification string `gorm:"property_identification" json:"property_identification"` // 属性标识
 	PropertyDataType       string `gorm:"property_data_type" json:"property_data_type"`           // 数据类型
+	PropertyPrecision      int    `gorm:"property_precision" json:"property_precision"`           //浮点型精度
 	PropertyUnit           string `gorm:"property_unit" json:"property_unit"`                     // 单位
 	PropertyRegister       int    `gorm:"property_register" json:"property_register"`             // 寄存器
 	AddressOffset          int    `gorm:"address_offset" json:"address_offset"`                   // 地址偏移
@@ -120,19 +126,29 @@ type ShakeLimit struct { //防抖
 
 // Device 结构体
 type Device struct {
-	GuId         string `json:"guid"`
-	Name         string `json:"name"`
-	ProductType  int    `json:"productType"`
-	ProductModel string `json:"productModel"`
-	BindStatus   int    `json:"bindStatus"`
-
-	FCode *Ft      `json:"fCode"`
-	Salve []*Slave `json:"salve"`
+	GuId         string   `json:"guid"`
+	Name         string   `json:"name"`
+	ProductType  int      `json:"productType"`
+	ProductModel string   `json:"productModel"`
+	BindStatus   int      `json:"bindStatus"`
+	Instruct     int      `json:"instruct"`
+	LineStatus   int      `json:"lineStatus"`
+	GroupId      int      `json:"groupId"`
+	FCode        *Ft      `json:"fCode"`
+	Salve        []*Slave `json:"salve"`
 }
 
 func (device *Device) IsType() bool {
 
 	if device.ProductType == 1 { //工业
+		return true
+	} else {
+		return false
+	}
+}
+func (device *Device) IsInstruct() bool {
+
+	if device.Instruct == 1 { //是否是单指令
 		return true
 	} else {
 		return false
@@ -155,11 +171,12 @@ type Ft struct {
 }
 
 type Slave struct {
-	SlaveId    byte   `json:"slaveId"`
-	SlaveName  string `json:"slaveName"`
-	Alarm      *Alarm `json:"alarm"`
-	DataTime   time.Time
-	LineStatus string
+	SlaveId    byte      `json:"slaveId"`
+	SlaveName  string    `json:"slaveName"`
+	Alarm      *Alarm    `json:"alarm"`
+	DataTime   time.Time `json:"dataTime"`
+	LineStatus string    `json:"lineStatus"`
+	Precision  int       `json:"precision"`
 }
 
 type Comm int8
@@ -183,9 +200,9 @@ type DeviceChange struct {
 }
 
 type Interface interface {
-	AlarmRule(slaveId byte, data uint16, fcode uint8, info *Device)
-	Trigger(data uint16)
-	Action(guid, status string, level int, data uint16, slaveId byte)
+	AlarmRule(slaveId byte, point int, data []byte, fcode uint8, info *Device)
+	Trigger(slaveId byte, point int, data []byte, info *Device)
+	Action(guid, status string, level int, data float64, slaveId byte, groupId int)
 }
 
 type Alarm struct {
@@ -193,97 +210,168 @@ type Alarm struct {
 	ShakeLimit *ShakeLimit `json:"shakeLimit"` //防抖动配置
 }
 
-func (engine *Alarm) AlarmRule(slaveId byte, data uint16, fcode uint8, info *Device) {
+func (engine *Alarm) AlarmRule(slaveId byte, point int, data []byte, fcode uint8, info *Device) {
+	value := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
 	if info.IsType() {
-		switch data { //是否工业产品
+		switch value { //是否工业产品
 		// 10000     探测器内部错误
 		case consts.InternalError:
-			engine.Action(info.GuId, consts.ALARM, consts.Internal, data, slaveId)
+			engine.Action(info.GuId, consts.ALARM, consts.Internal, 0, slaveId, info.GroupId)
 			break
 
 		// 20000     通讯错误
 		case consts.CommunicationError:
-			engine.Action(info.GuId, consts.ALARM, consts.Communication, data, slaveId)
+			engine.Action(info.GuId, consts.ALARM, consts.Communication, 0, slaveId, info.GroupId)
 			break
 
 		// 30000     主机未连接探测器、主机屏蔽探测器
 		case consts.ShieldError:
-			engine.Action(info.GuId, consts.ALARM, consts.Shield, data, slaveId)
+			engine.Action(info.GuId, consts.ALARM, consts.Shield, 0, slaveId, info.GroupId)
 			break
 
 			// 65535     探头故障
 		case consts.SlaveHitchError:
-			engine.Action(info.GuId, consts.ALARM, consts.SlaveHitch, data, slaveId)
+			engine.Action(info.GuId, consts.ALARM, consts.SlaveHitch, 0, slaveId, info.GroupId)
 			break
 		}
-		engine.Trigger(slaveId, data, info)
+		engine.Trigger(slaveId, point, data, info)
 	} else {
 		switch fcode {
 		case consts.ReadCode:
-			engine.Trigger(slaveId, data, info)
+			engine.Trigger(slaveId, point, data, info)
 			break
 		case consts.HomeHitchError:
 			//故障（若为0，是传感器低故障报警，若为1，是传感器高故障报警，若为2，是传感器寿命报警）
-			if data == 0 {
-				engine.Action(info.GuId, consts.ALARM, consts.LowHitch, data, slaveId)
-			} else if data == 1 {
-				engine.Action(info.GuId, consts.ALARM, consts.HighHitch, data, slaveId)
-			} else if data == 2 {
-				engine.Action(info.GuId, consts.ALARM, consts.Life, data, slaveId)
+			if value == 0 { //若为0，是传感器低故障报警
+				engine.Action(info.GuId, consts.ALARM, consts.LowHitch, 0, slaveId, info.GroupId)
+			} else if value == 1 { //若为1，是传感器高故障报警
+				engine.Action(info.GuId, consts.ALARM, consts.HighHitch, 0, slaveId, info.GroupId)
+			} else if value == 2 { //若为2，是传感器寿命报警
+				engine.Action(info.GuId, consts.ALARM, consts.Life, 0, slaveId, info.GroupId)
 			}
 			break
 		case consts.HomeHighError:
-			engine.Action(info.GuId, consts.ALARM, consts.High, data, slaveId)
+			engine.Action(info.GuId, consts.ALARM, consts.High, 0, slaveId, info.GroupId)
 			break
 		case consts.HomeLowError:
-			engine.Action(info.GuId, consts.ALARM, consts.Low, data, slaveId)
+			engine.Action(info.GuId, consts.ALARM, consts.Low, 0, slaveId, info.GroupId)
 			break
 		}
 
 	}
 }
-
-func (engine *Alarm) Trigger(slaveId byte, data uint16, info *Device) {
-
-	for _, trigger := range engine.Triggers { //循环告警触发条件
-
-		switch trigger.Operator { //TODO 判断比对条件(任意) 触发条件满足条件中任意一个即可触发  高报优先
-		case consts.EQ: //=
-			if data == trigger.FilterValue {
-				engine.Action(info.GuId, consts.ALARM, trigger.Level, data, slaveId)
-				return
-			}
-		case consts.NOT:
-			if data != trigger.FilterValue {
-				engine.Action(info.GuId, consts.ALARM, trigger.Level, data, slaveId)
-				return
-			}
-		case consts.GT:
-			if data > trigger.FilterValue {
-				engine.Action(info.GuId, consts.ALARM, trigger.Level, data, slaveId)
-				return
-			}
-		case consts.LT:
-			if data < trigger.FilterValue {
-				engine.Action(info.GuId, consts.ALARM, trigger.Level, data, slaveId)
-				return
-			}
-		case consts.GTE:
-			if data >= trigger.FilterValue {
-				engine.Action(info.GuId, consts.ALARM, trigger.Level, data, slaveId)
-				return
-			}
-		case consts.LTE:
-			if data <= trigger.FilterValue {
-				engine.Action(info.GuId, consts.ALARM, trigger.Level, data, slaveId)
-				return
+func floating(point int, data []byte) (val string) {
+	str := strconv.Itoa(int(encoding.BytesToUint16(encoding.BIG_ENDIAN, data)))
+	spot := len(str) - point
+	if len(str) > point {
+		for i, v := range str {
+			if i < spot {
+				val = strings.Join([]string{val, string(v)}, "")
+			} else if i == spot {
+				val = strings.Join([]string{val, string(v)}, ".")
+			} else {
+				val = strings.Join([]string{val, string(v)}, "")
 			}
 		}
 	}
-	engine.Action(info.GuId, consts.DATA, consts.Normal, data, slaveId)
+	return
+}
+func (engine *Alarm) Trigger(slaveId byte, point int, data []byte, info *Device) {
+
+	if point > 0 {
+		str := floating(point, data)
+		fmt.Printf("没有转---->string:%v", data)
+		dec, err := decimal.NewFromString(str)
+		fmt.Printf("转成---->decimal:%v", data)
+		value, _ := dec.Float64()
+		fmt.Printf("转成---->Float64:%v", value)
+		if err != nil {
+			return
+		}
+		for _, trigger := range engine.Triggers { //循环告警触发条件
+			filter := decimal.NewFromInt32(int32(trigger.FilterValue))
+			switch trigger.Operator { //TODO 判断比对条件(任意) 触发条件满足条件中任意一个即可触发  高报优先
+			case consts.EQ: //=
+
+				if dec.Equal(filter) {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.NOT:
+				if !dec.Equal(filter) {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.GT:
+				if dec.GreaterThan(filter) {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.LT:
+				if dec.LessThan(filter) {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.GTE:
+				if dec.GreaterThanOrEqual(filter) {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.LTE:
+				if dec.LessThanOrEqual(filter) {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			}
+		}
+
+		engine.Action(info.GuId, consts.DATA, consts.Normal, value, slaveId, info.GroupId)
+
+	} else {
+		data := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
+		in := decimal.NewFromInt32(int32(data))
+		value, _ := in.Float64()
+		for _, trigger := range engine.Triggers { //循环告警触发条件
+			switch trigger.Operator { //TODO 判断比对条件(任意) 触发条件满足条件中任意一个即可触发  高报优先
+			case consts.EQ: //=
+				if data == trigger.FilterValue {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.NOT:
+				if data != trigger.FilterValue {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.GT:
+				if data > trigger.FilterValue {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.LT:
+				if data < trigger.FilterValue {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.GTE:
+				if data >= trigger.FilterValue {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			case consts.LTE:
+				if data <= trigger.FilterValue {
+					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					return
+				}
+			}
+		}
+
+		engine.Action(info.GuId, consts.DATA, consts.Normal, value, slaveId, info.GroupId)
+	}
+
 }
 
-func (engine *Alarm) Action(guid, status string, level int, data uint16, slaveId byte) {
+func (engine *Alarm) Action(guid, status string, level int, data float64, slaveId byte, groupId int) {
 
 	device.DataChan <- &device.DeviceMsg{
 		Ts:       time.Now(),
@@ -292,6 +380,7 @@ func (engine *Alarm) Action(guid, status string, level int, data uint16, slaveId
 		DeviceId: guid,
 		SlaveId:  int(slaveId),
 		Data:     data,
+		GroupId:  groupId,
 	}
 	if status == consts.ALARM {
 		device.AlarmChan <- &device.DeviceMsg{
@@ -301,6 +390,7 @@ func (engine *Alarm) Action(guid, status string, level int, data uint16, slaveId
 			DeviceId: guid,
 			SlaveId:  int(slaveId),
 			Data:     data,
+			GroupId:  groupId,
 		}
 	}
 

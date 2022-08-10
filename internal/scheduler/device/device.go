@@ -11,6 +11,7 @@ import (
 	"giot/pkg/modbus"
 	"giot/utils/consts"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
 	"reflect"
 	"time"
@@ -46,6 +47,7 @@ func Setup(Etcd etcd.Interface, Db *gorm.DB, mqtt mqtt.Client) error {
 		db:      Db,
 		mqtt:    mqtt,
 	}
+
 	err := device.deviceLoad()
 	if err != nil {
 		return err
@@ -115,19 +117,23 @@ func (device *Device) DeviceLister() error {
 	}
 	return nil
 }
+
 func (device *Device) deviceLoad() error {
 	log.Sugar.Info("Initialize device load.....")
-	size := 10
+	size := 100
 	page := 1
-
+	device.etcd.DeleteWithPrefix(context.TODO(), "device/")
 	var devices []*model.PigDevice
-
+	var cou int64
+	device.db.Model(devices).Count(&cou)
+	bar := progressbar.Default(cou)
 	for {
 		offset := size * (page - 1)
 		err := device.db.Offset(offset).Limit(size).Find(&devices).Error //查询设备
 		if err != nil {
 			return err
 		}
+
 		//没有数据就跳出加载
 		if len(devices) <= 0 {
 			break
@@ -135,6 +141,8 @@ func (device *Device) deviceLoad() error {
 		page++
 
 		for _, d := range devices {
+			bar.Clear()
+			bar.Add(1)
 			var product model.PigProduct
 			err := device.db.Where(&model.PigProduct{Id: d.ProductId}).First(&product).Error
 			if err != nil {
@@ -147,15 +155,19 @@ func (device *Device) deviceLoad() error {
 			}
 			slaves, err := device.getSalve(d.Id, ta, instruct)
 			if err != nil {
-				return err
+				log.Sugar.Errorf("load db slave info error：%s", err)
+				continue
 			}
 			devic := &model.Device{
 				GuId:        d.Id,
 				Name:        d.DeviceName,
 				ProductType: product.ProductType,
+				Instruct:    d.InstructFlag,
 				FCode:       ta.Ft,
 				Salve:       slaves,
 				BindStatus:  d.BindStatus,
+				LineStatus:  d.LineStatus,
+				GroupId:     d.GroupId,
 			}
 			if !reflect.DeepEqual(devic, model.Device{}) { //etcd device
 				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
@@ -181,6 +193,14 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 	}
 	var slaves []*model.Slave
 	var already bool
+	//30s 指令
+	if instruct && !already { //单
+		err := device.createF1Active(ta, 3, 5)
+		if err != nil {
+			return nil, err
+		}
+		already = true
+	}
 	for _, s := range deviceSlaves {
 		//属性查询
 		var property *model.PigProperty
@@ -193,17 +213,11 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 		slave := &model.Slave{
 			SlaveId:   byte(s.ModbusAddress),
 			SlaveName: s.SlaveName,
+			Precision: property.PropertyPrecision,
 		}
 		if !reflect.DeepEqual(property, model.PigProperty{}) {
 
-			//30s 指令
-			if instruct && !already { //单
-				err := device.createActive(ta, property.PropertyRegister, s.ModbusAddress, property.AddressOffset)
-				if err != nil {
-					return nil, err
-				}
-				already = true
-			} else if !instruct { //多
+			if !instruct { //多
 				err := device.createActive(ta, property.PropertyRegister, s.ModbusAddress, property.AddressOffset)
 				if err != nil {
 					return nil, err
@@ -238,8 +252,8 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 				ShakeLimit: shake,
 			}
 
+			slaves = append(slaves, slave)
 		}
-		slaves = append(slaves, slave)
 	}
 	return slaves, nil
 }
@@ -247,7 +261,16 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 // createActive  创建动态指令
 func (device *Device) createActive(ta *model.TimerActive, code, salveId int, propertyRegister int) error {
 	tc := &tCode{}
-	err := tc.crateTimerCode(TIMER10_SECOND, ta).functionCode(code, device.modbuls, byte(salveId), uint16(propertyRegister))
+	err := tc.crateTimerCode(TIMER20_SECOND, ta).functionCode(code, device.modbuls, byte(salveId), uint16(propertyRegister))
+	if err != nil {
+		return err
+	}
+	return err
+
+}
+func (device *Device) createF1Active(ta *model.TimerActive, code, salveSize int) error {
+	tc := &tCode{}
+	err := tc.crateTimerCode(TIMER20_SECOND, ta).functionCode(code, device.modbuls, byte(241), uint16(salveSize))
 	if err != nil {
 		return err
 	}

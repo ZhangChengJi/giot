@@ -43,8 +43,8 @@ const (
 
 	//+++++++++++++++工业+++++++++++++++++++
 	InternalError      = 10000 //探测器内部错误
-	CommunicationError = 2000  //通讯错误
-	ShieldError        = 3000  //主机未连接探测器、主机屏蔽探测器
+	CommunicationError = 20000 //通讯错误
+	ShieldError        = 30000 //主机未连接探测器、主机屏蔽探测器
 	SlaveHitchError    = 65535 //探头故障
 
 	//+++++++++++++家用++++++++++++++++++++

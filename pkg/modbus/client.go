@@ -4,27 +4,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-)
-
-type RegType uint
-type Endianness uint
-type WordOrder uint
-
-const (
-	PARITY_NONE uint = 0
-	PARITY_EVEN uint = 1
-	PARITY_ODD  uint = 2
-
-	HOLDING_REGISTER RegType = 0
-	INPUT_REGISTER   RegType = 1
-
-	// endianness of 16-bit registers
-	BIG_ENDIAN    Endianness = 1
-	LITTLE_ENDIAN Endianness = 2
-
-	// word order of 32-bit registers
-	HIGH_WORD_FIRST WordOrder = 1
-	LOW_WORD_FIRST  WordOrder = 2
+	"giot/utils/encoding"
+	"strconv"
 )
 
 type client struct {
@@ -76,10 +57,13 @@ func (c *client) WriteSingleRegister(slaveId byte, address, quantity uint16, val
 	}
 	return c.rtuHandler.Encode(&request)
 }
-func (c *client) ReadIndustryCode(data []byte) (result *ResultProtocolDataUnit16, err error) {
+func (c *client) ReadIndustryCode(data []byte) (result *ResultProtocolDataStr, err error) {
 	return c.rtuHandler.Decode(data)
 }
-func (c *client) ReadHomeCode(data []byte) (pdu *ResultProtocolDataUnit16, err error) {
+func (c *client) ReadIndustryF1Code(data []byte) (result []*ProtocolDataUnit, err error) {
+	return c.rtuHandler.F1Decode(data)
+}
+func (c *client) ReadHomeCode(data []byte) (pdu *ResultProtocolDataStr, err error) {
 	return c.rtuHandler.HomeDecode(data)
 }
 
@@ -98,7 +82,7 @@ func (c *client) WriteMultipleRegisters(address, quantity uint16, value []byte) 
 		err = fmt.Errorf("modbus: quantity '%v' must be between '%v' and '%v',", quantity, 1, 123)
 		return
 	}
-	a := bytesToFloat32s(BIG_ENDIAN, HIGH_WORD_FIRST, dataBlockSuffix(value, address, quantity))
+	a := encoding.BytesToFloat32s(encoding.BIG_ENDIAN, encoding.HIGH_WORD_FIRST, dataBlockSuffix(value, address, quantity))
 	fmt.Println(a)
 	request := ProtocolDataUnit{
 		FunctionCode: FuncCodeWriteMultipleRegisters,
@@ -181,7 +165,7 @@ func readHex(data []byte) (value byte, err error) {
 }
 
 // Decode extracts PDU from RTU frame and verify CRC. Decode 解码
-func (mb *RtuHandler) Decode(adu []byte) (result *ResultProtocolDataUnit16, err error) {
+func (mb *RtuHandler) Decode(adu []byte) (result *ResultProtocolDataStr, err error) {
 	length := len(adu)
 	// Calculate checksum
 	var crc crc
@@ -193,17 +177,72 @@ func (mb *RtuHandler) Decode(adu []byte) (result *ResultProtocolDataUnit16, err 
 		return
 	}
 	// Function code & data
-	result = &ResultProtocolDataUnit16{}
-	result.SaveId = adu[0]       //从机id
+	result = &ResultProtocolDataStr{}
+	result.SlaveId = adu[0]      //从机id
 	result.FunctionCode = adu[1] //功能码
 
-	result.Data = bytesToUint16(BIG_ENDIAN, adu[3:len(adu)-2]) //数据
+	result.Data = strconv.Itoa(int(encoding.BytesToUint16(encoding.BIG_ENDIAN, adu[3:len(adu)-2]))) //数据
+	return
+}
+
+// F1Decode 主机 extracts PDU from RTU frame and verify CRC. Decode 解码
+func (mb *RtuHandler) F1Decode(adu []byte) (result []*ProtocolDataUnit, err error) {
+	length := len(adu)
+	// Calculate checksum
+	var crc crc
+	crc.reset().pushBytes(adu[0 : length-2])
+	checksum := uint16(adu[length-1])<<8 | uint16(adu[length-2])
+	if checksum != crc.value() {
+		err = fmt.Errorf("modbus: response crc '%v' does not match expected '%v'", checksum, crc.value())
+		return
+	}
+	var s uint8 = 1
+	data := adu[3 : len(adu)-2]
+	var size uint8 = adu[2]
+	for i := 0; i < int(size); i += 2 {
+		protocolDataUnit := &ProtocolDataUnit{}
+		protocolDataUnit.SlaveId = s
+		protocolDataUnit.FunctionCode = adu[1]
+		protocolDataUnit.Data = data[i : i+2]
+		result = append(result, protocolDataUnit)
+		s++
+	}
+
+	//for _, val := range length {
+	//	protocolDataStr := &ProtocolDataUnit{}
+	//	protocolDataStr.SlaveId = s           //从机id
+	//	protocolDataStr.FunctionCode = adu[1] //功能码
+	//	//protocolDataStr.DataType = val
+	//	protocolDataStr.Data = data[i : i+2]
+	//	if val > 0 { //精度大于0
+	//		//protocolDataStr.DataType = 1
+	//		//str := strconv.Itoa(int(bytesToUint16(BIG_ENDIAN, data[i:i+2])))
+	//		//spot := len(str) - val
+	//		//if len(str) > val {
+	//		//	for i, v := range str {
+	//		//		if i < spot {
+	//		//			protocolDataStr.Data = strings.Join([]string{protocolDataStr.Data, string(v)}, "")
+	//		//		} else if i == spot {
+	//		//			protocolDataStr.Data = strings.Join([]string{protocolDataStr.Data, string(v)}, ".")
+	//		//		} else {
+	//		//			protocolDataStr.Data = strings.Join([]string{protocolDataStr.Data, string(v)}, "")
+	//		//		}
+	//		//	}
+	//		//}
+	//
+	//	} else {
+	//		//protocolDataStr.DataType = 0
+	//		protocolDataStr.Data = data[i : i+2]
+	//		//protocolDataStr.Data = strconv.Itoa(int(bytesToUint16(BIG_ENDIAN, data[i:i+2])))
+	//	}
+
+	//}
 	return
 }
 
 var homeCode = [...]byte{0x70, 0x65, 0x66, 0x63, 0x64}
 
-func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataUnit16, err error) {
+func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataStr, err error) {
 	length := len(adu)
 	// Calculate checksum
 	var crc crc
@@ -214,8 +253,8 @@ func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataUnit16, err
 		return
 	}
 	// Function code & data
-	pdu = &ResultProtocolDataUnit16{}
-	pdu.SaveId = adu[0] //从机id
+	pdu = &ResultProtocolDataStr{}
+	pdu.SlaveId = adu[0] //从机id
 	for _, b := range homeCode {
 		if b == adu[1] {
 			pdu.FunctionCode = adu[1] //功能码
@@ -223,7 +262,7 @@ func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataUnit16, err
 		}
 	}
 
-	pdu.Data = bytesToUint16(BIG_ENDIAN, adu[24:32]) //数据
+	//pdu.Data = strconv.Itoa(int(encoding.bytesToUint16(BIG_ENDIAN, adu[24:32]))) //数据
 
 	return
 }

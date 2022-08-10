@@ -28,7 +28,9 @@ require (
 	github.com/orcaman/concurrent-map v1.0.0
 	github.com/panjf2000/gnet v1.6.4
 	github.com/panjf2000/gnet/v2 v2.0.3
+	github.com/schollz/progressbar/v3 v3.8.7
 	github.com/shiningrush/droplet v0.3.0
+	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1

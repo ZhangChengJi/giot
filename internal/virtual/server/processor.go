@@ -72,23 +72,10 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 		case data := <-da:
 			info, err := p.deviceStore.Get(context.TODO(), data.RemoteAddr)
 			if err == nil && info != nil {
-				var result *modbus.ResultProtocolDataUnit16
-				if info.IsType() {
-					result, err = p.modbus.ReadIndustryCode(data.Frame) //解码
-				} else {
-					result, err = p.modbus.ReadHomeCode(data.Frame) //解码
-				}
+				results, err := p.protocol(info, data.RemoteAddr, data.Frame)
 				if err == nil {
-					if slave, err := p.slaveStore.GetSlave(context.TODO(), data.RemoteAddr, result.SaveId); err == nil { //获取属性ID
-						slave.DataTime = time.Now()
-						if slave.LineStatus == "" || slave.LineStatus == consts.OFFLINE {
-							fmt.Printf("时间:%v----->slave:%v上⬆️线\n", time.Now().Format("2006-01-02 15:04:05"), slave.SlaveId)
-							slave.LineStatus = consts.ONLINE
-							device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: info.GuId, SlaveId: int(slave.SlaveId)}
-						}
-						slave.Alarm.AlarmRule(slave.SlaveId, result.Data, result.FunctionCode, info)
-					} else {
-						log.Sugar.Errorf("salve:%s not found", result.SaveId)
+					for _, result := range results {
+						p.alarmFilter(data.RemoteAddr, result, info)
 					}
 				}
 			} else {
@@ -101,9 +88,43 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 			//等待缓冲
 		}
 	}
-
 }
 
+func (p *Processor) protocol(info *model.Device, remoteAddr string, frame []byte) (results []*modbus.ProtocolDataUnit, err error) {
+
+	//var result *modbus.ProtocolDataUnit
+	fmt.Printf("时间:%v——--->指令上报:%X\n", time.Now().Format("2006-01-02 15:04:05"), frame)
+	if info.IsType() { //是否是工业产品
+		if info.IsInstruct() { //是否是单指令下发
+			results, err = p.modbus.ReadIndustryF1Code(frame)
+		}
+	} else {
+		//result, err = p.modbus.ReadIndustryCode(frame) //解码
+		//results = append(results, result)
+
+		//} else {
+		//	result, err = p.modbus.ReadHomeCode(frame) //解码
+		//results = append(results, result)
+
+	}
+	return results, nil
+}
+
+func (p *Processor) alarmFilter(remoteAddr string, result *modbus.ProtocolDataUnit, info *model.Device) {
+	if slave, err := p.slaveStore.GetSlave(context.TODO(), remoteAddr, result.SlaveId); err == nil { //获取属性ID
+		slave.DataTime = time.Now()
+		//第一次发送上线通知
+		if slave.LineStatus == "" || slave.LineStatus == consts.OFFLINE {
+			fmt.Printf("时间:%v----->slave:%v上⬆️线\n", time.Now().Format("2006-01-02 15:04:05"), slave.SlaveId)
+			slave.LineStatus = consts.ONLINE
+			device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: info.GuId, SlaveId: int(slave.SlaveId)}
+		}
+		//
+		slave.Alarm.AlarmRule(slave.SlaveId, slave.Precision, result.Data, result.FunctionCode, info)
+	} else {
+		log.Sugar.Errorf("salve:%v not found", result.SlaveId)
+	}
+}
 func (p *Processor) ListenCommand(msg chan *model.ListenMsg) {
 	for {
 		select {
@@ -236,6 +257,9 @@ func (p *Processor) activeStore(guid, val string) error {
 		Name:         de.Name,
 		ProductType:  de.ProductType,
 		ProductModel: de.ProductModel,
+		Instruct:     de.Instruct,
+		LineStatus:   de.LineStatus,
+		GroupId:      de.GroupId,
 	}
 	p.deviceStore.Update(context.TODO(), remoteAddr, deviceInfo)
 
@@ -313,6 +337,9 @@ func (p *Processor) register(data *model.RegisterData) {
 			Name:         de.Name,
 			ProductType:  de.ProductType,
 			ProductModel: de.ProductModel,
+			Instruct:     de.Instruct,
+			LineStatus:   de.LineStatus,
+			GroupId:      de.GroupId,
 		}
 		if de.FCode != nil {
 			p.TimerStore.Create(context.TODO(), remoteAddr, task)

@@ -52,7 +52,10 @@ func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
 		log.Sugar.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
-	t.queue.Enqueue(device)
+	if device.GroupId > 0 { //判断是否分组id未空，没有分配分组就不进行数据存储
+		t.queue.Enqueue(device)
+	}
+
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
@@ -62,8 +65,10 @@ func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
 		log.Sugar.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
 	}
-	t.alarmChan <- &device
-	t.queue.Enqueue(device)
+	if device.GroupId > 0 { //判断是否分组id未空，没有分配分组就不进行数据存储
+		t.alarmChan <- &device
+		t.queue.Enqueue(device)
+	}
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }

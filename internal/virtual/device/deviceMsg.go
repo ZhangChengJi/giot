@@ -5,6 +5,7 @@ import (
 	"giot/utils"
 	"giot/utils/consts"
 	"hash/fnv"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,12 +15,13 @@ type DeviceMsg struct {
 	DataType  string    `json:"dataType"`
 	Level     int       `json:"level"`
 	DeviceId  string    `json:"deviceId"`
+	GroupId   int       `json:"groupId"`
 	Status    string    `json:"status"`
 	Name      string    `json:"name" `
 	SlaveId   int       `json:"slaveId"`
 	SlaveName string    `json:"slaveName"`
 	Address   string    `json:"address"`
-	Data      uint16    `json:"data"`
+	Data      float64   `json:"data"`
 }
 
 // Change max partitions as you need.
@@ -51,9 +53,9 @@ func (r DeviceMsg) TaosSTable() string {
 func (r DeviceMsg) TaosTags() []interface{} {
 	var tags []interface{}
 	if r.DataType == consts.DATA {
-		tags = append(tags, r.DeviceId, r.SlaveId)
+		tags = append(tags, r.DeviceId, r.SlaveId, r.GroupId)
 	} else {
-		tags = append(tags, r.DeviceId, r.SlaveId)
+		tags = append(tags, r.DeviceId, r.SlaveId, r.GroupId)
 	}
 	return tags
 }
@@ -62,9 +64,9 @@ func (r DeviceMsg) TaosTags() []interface{} {
 func (r DeviceMsg) TaosTable() string {
 	switch r.DataType {
 	case consts.DATA:
-		return strings.Join([]string{"device_data", r.DeviceId}, "")
+		return strings.Join([]string{"device_data", r.DeviceId, strconv.Itoa(r.SlaveId), strconv.Itoa(r.GroupId)}, "_")
 	case consts.ALARM:
-		return strings.Join([]string{"device_alarm", r.DeviceId}, "")
+		return strings.Join([]string{"device_alarm", r.DeviceId, strconv.Itoa(r.SlaveId), strconv.Itoa(r.GroupId)}, "_")
 	default:
 		return ""
 
