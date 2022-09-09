@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"giot/internal/virtual/mqtt"
 	"giot/pkg/log"
 	"giot/pkg/modbus"
@@ -15,6 +14,7 @@ import (
 
 var (
 	DataChan   chan *DeviceMsg
+	LastChan   chan *DeviceMsg
 	AlarmChan  chan *DeviceMsg
 	OnlineChan chan *DeviceMsg
 	DebugChan  chan *Debug
@@ -37,9 +37,10 @@ type Interface interface {
 }
 
 func Init() {
-	DataChan = make(chan *DeviceMsg)
-	AlarmChan = make(chan *DeviceMsg)
-	OnlineChan = make(chan *DeviceMsg)
+	DataChan = make(chan *DeviceMsg, 1024)
+	AlarmChan = make(chan *DeviceMsg, 1024)
+	OnlineChan = make(chan *DeviceMsg, 1024)
+	LastChan = make(chan *DeviceMsg, 1024)
 	DebugChan = make(chan *Debug)
 	d := &device{mqtt: mqtt.Broker{Client: mqtt.Client}, modbus: modbus.NewClient(&modbus.RtuHandler{})}
 
@@ -55,13 +56,12 @@ func (d *device) listenLoop() {
 		select {
 		case data := <-DataChan:
 			d.Insert(data)
-			fmt.Println("我是正常数据", data.Data)
 		case data := <-AlarmChan:
 			d.InsertAlarm(data)
-			fmt.Println("我是报警数据", data.Data)
+
 		case data := <-OnlineChan:
 			d.Online(data)
-			fmt.Println("我是上下线数据", data.Status)
+
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
@@ -72,7 +72,14 @@ func (d *device) Insert(data *DeviceMsg) {
 	var buf bytes.Buffer
 	buf.WriteString("device/data/")
 	buf.WriteString(data.DeviceId)
-	fmt.Println(buf.String())
+	payload, _ := json.Marshal(data)
+	d.mqtt.Publish(buf.String(), payload)
+
+}
+func (d *device) InsertLast(data *DeviceMsg) {
+	var buf bytes.Buffer
+	buf.WriteString("device/Last/")
+	buf.WriteString(data.DeviceId)
 	payload, _ := json.Marshal(data)
 	d.mqtt.Publish(buf.String(), payload)
 

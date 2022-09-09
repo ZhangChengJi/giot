@@ -52,7 +52,7 @@ conf:
     host: 192.168.0.73
     port: 1883
     username: admin
-    password: public
+    password: dory@2022
     scheduler_client_id: scheduler
     virtual_client_id: virtual
   tdengine:
@@ -62,6 +62,10 @@ conf:
     password: taosdata
     Keep: 90
     Days: 20
+  redis:
+    addr: 192.168.0.73:6379
+    password:
+    db: 1
                           # yamllint disable rule:comments-indentation
                           # etcd basic auth info
     # username: "root"    # ignore etcd username if not enable etcd auth

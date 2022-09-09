@@ -15,6 +15,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.3.5
+	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
@@ -25,12 +26,14 @@ require (
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
 	github.com/lithammer/dedent v1.1.0
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/onsi/gomega v1.20.2 // indirect
 	github.com/orcaman/concurrent-map v1.0.0
-	github.com/panjf2000/gnet v1.6.4
-	github.com/panjf2000/gnet/v2 v2.0.3
+	github.com/panjf2000/gnet v1.6.6
+	github.com/panjf2000/gnet/v2 v2.1.1
 	github.com/schollz/progressbar/v3 v3.8.7
 	github.com/shiningrush/droplet v0.3.0
-	github.com/shopspring/decimal v1.3.1 // indirect
+	github.com/shopspring/decimal v1.3.1
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1

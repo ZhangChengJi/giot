@@ -10,6 +10,7 @@ import (
 	"giot/pkg/gorm"
 	"giot/pkg/log"
 	"giot/pkg/mqtt"
+	"giot/pkg/redis"
 	"giot/pkg/tdengine"
 	"math/rand"
 	"os"
@@ -63,14 +64,18 @@ func (s *server) init() error {
 		fmt.Println(err)
 		return err
 	}
-
-	err = device.Setup(etcd.GenEtcdStorage(), db, mq)
+	re, err := redis.New(conf.RedisConfig)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	err = device.Setup(etcd.GenEtcdStorage(), db, mq, re)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	go transfer.Setup(mq, td, db)
+	go transfer.Setup(mq, td, db, re)
 
 	return nil
 }

@@ -46,6 +46,7 @@ var (
 	GnetConfig     *Gnet
 	MqttConfig     *Mqtt
 	TdengineConfig *Tdengine
+	RedisConfig    *Redis
 	ZapConfig      *Zap
 )
 
@@ -89,13 +90,18 @@ type Tdengine struct {
 	Keep     int
 	Days     int
 }
-
+type Redis struct {
+	Addr     string
+	Password string
+	Db       int
+}
 type Conf struct {
 	Etcd      Etcd
 	Mqtt      Mqtt
 	Mysql     Mysql
 	Gnet      Gnet
 	Tdengine  Tdengine
+	Redis     Redis
 	Zap       Zap
 	AllowList []string `mapstructure:"allow_list"`
 	MaxCpu    int      `mapstructure:"max_cpu"`
@@ -229,6 +235,9 @@ func setupConfig() {
 	if len(config.Conf.Mqtt.Host) > 0 {
 		initMqtt(config.Conf.Mqtt)
 	}
+	if len(config.Conf.Redis.Addr) > 0 {
+		initRedis(config.Conf.Redis)
+	}
 
 	// set degree of parallelism
 	initParallelism(config.Conf.MaxCpu)
@@ -325,5 +334,12 @@ func initMqtt(conf Mqtt) {
 		Port:     conf.Port,
 		Username: conf.Username,
 		Password: conf.Password,
+	}
+}
+func initRedis(conf Redis) {
+	RedisConfig = &Redis{
+		Addr:     conf.Addr,
+		Password: conf.Password,
+		Db:       conf.Db,
 	}
 }

@@ -5,28 +5,27 @@ import (
 	"giot/internal/model"
 	"giot/internal/virtual/protocol"
 	"giot/pkg/log"
-	"github.com/panjf2000/gnet/v2"
+	"github.com/panjf2000/gnet"
 	"strings"
 	"sync"
 )
 
 type TcpServer struct {
-	gnet.BuiltinEventEngine
-
+	*gnet.EventServer
 	connectedSockets sync.Map
 	RegisterChan     chan *model.RegisterData
 	DataChan         chan *model.RemoteData
 	ListenMsgChan    chan *model.ListenMsg
 }
 
-func (ps *TcpServer) OnOpen(c gnet.Conn) (out []byte, action gnet.Action) {
+func (ps *TcpServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {
 	c.SetContext(new(protocol.ModbusCodec))
 	log.Sugar.Infof("Socket with addr: %s has been opened...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Store(c.RemoteAddr().String(), c)
 	return
 }
 
-func (ps *TcpServer) OnClose(c gnet.Conn, err error) (action gnet.Action) {
+func (ps *TcpServer) OnClosed(c gnet.Conn, err error) (action gnet.Action) {
 	log.Sugar.Infof("Socket with addr: %s is closing...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Delete(c.RemoteAddr().String())
 	ha := &model.ListenMsg{
@@ -37,9 +36,9 @@ func (ps *TcpServer) OnClose(c gnet.Conn, err error) (action gnet.Action) {
 	ps.ListenMsgChan <- ha
 	return
 }
-func (ps *TcpServer) OnTraffic(c gnet.Conn) gnet.Action {
-	data, _ := c.Next(-1)
-
+func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+	data := make([]byte, len(frame))
+	copy(data, frame)
 	length := len(data)
 	if length > 0 && length >= 7 && length <= 44 {
 		if length == 24 || length == 44 { //注册
@@ -55,5 +54,5 @@ func (ps *TcpServer) OnTraffic(c gnet.Conn) gnet.Action {
 			ps.DataChan <- da
 		}
 	}
-	return gnet.None
+	return
 }

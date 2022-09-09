@@ -2,8 +2,7 @@ package transfer
 
 import (
 	"database/sql"
-	"fmt"
-	"giot/internal/model"
+	"giot/internal/scheduler/line"
 	"giot/internal/virtual/device"
 	"giot/pkg/log"
 	"giot/pkg/queue"
@@ -11,9 +10,11 @@ import (
 	"giot/utils/consts"
 	"giot/utils/json"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/go-redis/redis"
 	"golang.org/x/text/message"
 	"gorm.io/gorm"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -26,25 +27,26 @@ type Transfer struct {
 	dataChan  chan []byte
 	alarmChan chan *device.DeviceMsg
 	queue     *queue.Queue
+	li        line.LineCache
 }
 
-func Setup(mqtt mqtt.Client, tdengine *sql.DB, mysql *gorm.DB) {
+func Setup(mqtt mqtt.Client, tdengine *sql.DB, mysql *gorm.DB, redis *redis.Client) {
 	var t = &Transfer{
 		mq:        mqtt,
 		td:        tdengine,
 		db:        mysql,
+		li:        &line.Line{Re: redis},
 		alarmChan: make(chan *device.DeviceMsg, 1024),
 		queue:     queue.NewWithOption(queue.DefaultOption()),
 	}
 	t.consume(t.queue, 4, t.td)
-	//go t.notifyLoop()
 	t.listenMqtt()
 }
 
 func (t *Transfer) listenMqtt() {
 	t.mq.Subscribe("device/data/#", 0, t.dataHandler)
 	t.mq.Subscribe("device/alarm/#", 0, t.alarmHandler)
-	t.mq.Subscribe("device/online/#", 0, t.onlineHandler)
+	t.mq.Subscribe("device/line/#", 0, t.lineHandler)
 }
 func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
 	var device device.DeviceMsg
@@ -56,8 +58,8 @@ func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {
 		t.queue.Enqueue(device)
 	}
 
-	fmt.Printf("TOPIC: %s\n", msg.Topic())
-	fmt.Printf("MSG: %s\n", msg.Payload())
+	//fmt.Printf("TOPIC: %s\n", msg.Topic())
+	//fmt.Printf("MSG: %s\n", msg.Payload())
 }
 func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
 	var device device.DeviceMsg
@@ -69,12 +71,13 @@ func (t *Transfer) alarmHandler(client mqtt.Client, msg mqtt.Message) {
 		t.alarmChan <- &device
 		t.queue.Enqueue(device)
 	}
-	fmt.Printf("TOPIC: %s\n", msg.Topic())
-	fmt.Printf("MSG: %s\n", msg.Payload())
+	//fmt.Printf("TOPIC: %s\n", msg.Topic())
+	//fmt.Printf("MSG: %s\n", msg.Payload())
 }
 
-func (t *Transfer) onlineHandler(client mqtt.Client, msg mqtt.Message) {
+func (t *Transfer) lineHandler(client mqtt.Client, msg mqtt.Message) {
 	var device device.DeviceMsg
+
 	if err := FromMqttBytes(msg.Payload(), &device); err != nil {
 		log.Sugar.Errorf("topic data:%v Err: %v\n", msg.Topic(), message.Key, err)
 		return
@@ -91,48 +94,20 @@ func (t *Transfer) onlineHandler(client mqtt.Client, msg mqtt.Message) {
 }
 
 //设备↕上下线
-func (t *Transfer) online(guid string, slaveId int) {
+func (t *Transfer) online(deviceId string, slaveId int) {
 	if slaveId == 0 {
-		var pigDevice model.PigDevice
-		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and id=?", 0, guid).Update("line_status", 1).Error
-		if err != nil {
-			log.Sugar.Errorf("online guid:%s update failed", guid)
-			return
-		}
-
+		t.li.SetDeviceOnline(deviceId)
 	} else {
-		var slave model.PigDeviceSlave
-		fmt.Printf("slave:%v online", slaveId)
-		err := t.db.Debug().Model(&slave).Where("device_id=? and modbus_address=? and line_status=? ", guid, slaveId, 0).Update("line_status", 1).Error
-		if err != nil {
-			log.Sugar.Errorf("online guid:%s update failed", guid)
-			return
-		}
+		t.li.SetSlaveOnline(deviceId, strconv.Itoa(slaveId))
 	}
 
 }
-func (t *Transfer) offline(guid string, slaveId int) {
-	var slave model.PigDeviceSlave
+func (t *Transfer) offline(deviceId string, slaveId int) {
 	if slaveId == 0 {
-		var pigDevice model.PigDevice
-		err := t.db.Debug().Model(&pigDevice).Where("line_status=? and id=?", 1, guid).Update("line_status", 0).Error
-		if err != nil {
-			log.Sugar.Errorf("offline guid:%s update failed", guid)
-			return
-		}
-		//fmt.Printf("slave:%v offline", slaveId)
-		//err = t.db.Debug().Model(&slave).Where("id=? and line_status=? ", guid, 1).Update("line_status", 0).Error
-		//if err != nil {
-		//	logs.Errorf("online guid:%s update failed", guid)
-		//	return
-		//}
+		t.li.SetDeviceOffline(deviceId)
+		t.li.BatchSlaveOffline(deviceId)
 	} else {
-		fmt.Printf("slave:%v offline", slaveId)
-		err := t.db.Debug().Model(&slave).Where("device_id=? and modbus_address=? and line_status=? ", guid, slaveId, 1).Update("line_status", 0).Error
-		if err != nil {
-			log.Sugar.Errorf("online guid:%s update failed", guid)
-			return
-		}
+		t.li.SetSlaveOffline(deviceId, strconv.Itoa(slaveId))
 	}
 }
 
@@ -156,7 +131,7 @@ func (t *Transfer) consume(q *queue.Queue, workers int, taos *sql.DB) {
 					continue
 				}
 				runtime.Gosched()
-				fmt.Println("sql:======" + sqlStr)
+				//fmt.Println("sql:======" + sqlStr)
 				_, err = taos.Exec(sqlStr)
 				if err != nil {
 					log.Sugar.Errorf("exec query error: %v, the sql command is:\n%s\n", err, sqlStr)

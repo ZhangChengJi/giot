@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"giot/utils/encoding"
-	"strconv"
 )
 
 type client struct {
@@ -57,13 +56,13 @@ func (c *client) WriteSingleRegister(slaveId byte, address, quantity uint16, val
 	}
 	return c.rtuHandler.Encode(&request)
 }
-func (c *client) ReadIndustryCode(data []byte) (result *ResultProtocolDataStr, err error) {
+func (c *client) ReadIndustryCode(data []byte) (result *ProtocolDataUnit, err error) {
 	return c.rtuHandler.Decode(data)
 }
 func (c *client) ReadIndustryF1Code(data []byte) (result []*ProtocolDataUnit, err error) {
 	return c.rtuHandler.F1Decode(data)
 }
-func (c *client) ReadHomeCode(data []byte) (pdu *ResultProtocolDataStr, err error) {
+func (c *client) ReadHomeCode(data []byte) (pdu *ProtocolDataUnit, err error) {
 	return c.rtuHandler.HomeDecode(data)
 }
 
@@ -165,7 +164,7 @@ func readHex(data []byte) (value byte, err error) {
 }
 
 // Decode extracts PDU from RTU frame and verify CRC. Decode 解码
-func (mb *RtuHandler) Decode(adu []byte) (result *ResultProtocolDataStr, err error) {
+func (mb *RtuHandler) Decode(adu []byte) (result *ProtocolDataUnit, err error) {
 	length := len(adu)
 	// Calculate checksum
 	var crc crc
@@ -177,11 +176,11 @@ func (mb *RtuHandler) Decode(adu []byte) (result *ResultProtocolDataStr, err err
 		return
 	}
 	// Function code & data
-	result = &ResultProtocolDataStr{}
+	result = &ProtocolDataUnit{}
 	result.SlaveId = adu[0]      //从机id
 	result.FunctionCode = adu[1] //功能码
 
-	result.Data = strconv.Itoa(int(encoding.BytesToUint16(encoding.BIG_ENDIAN, adu[3:len(adu)-2]))) //数据
+	result.Data = adu[3 : len(adu)-2] //数据
 	return
 }
 
@@ -242,7 +241,7 @@ func (mb *RtuHandler) F1Decode(adu []byte) (result []*ProtocolDataUnit, err erro
 
 var homeCode = [...]byte{0x70, 0x65, 0x66, 0x63, 0x64}
 
-func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataStr, err error) {
+func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ProtocolDataUnit, err error) {
 	length := len(adu)
 	// Calculate checksum
 	var crc crc
@@ -253,7 +252,7 @@ func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataStr, err er
 		return
 	}
 	// Function code & data
-	pdu = &ResultProtocolDataStr{}
+	pdu = &ProtocolDataUnit{}
 	pdu.SlaveId = adu[0] //从机id
 	for _, b := range homeCode {
 		if b == adu[1] {
@@ -262,7 +261,7 @@ func (mb *RtuHandler) HomeDecode(adu []byte) (pdu *ResultProtocolDataStr, err er
 		}
 	}
 
-	//pdu.Data = strconv.Itoa(int(encoding.bytesToUint16(BIG_ENDIAN, adu[24:32]))) //数据
+	pdu.Data = adu[24:32] //数据
 
 	return
 }

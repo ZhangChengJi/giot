@@ -26,6 +26,7 @@ const (
 	Life                 //家报寿命
 	DATA          = "data"
 	ALARM         = "alarm"
+	HITCH         = "hitch"
 	SMS           = "sms"
 	VOICE         = "voice"
 	WECHAT        = "wechat"

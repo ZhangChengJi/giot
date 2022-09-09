@@ -29,7 +29,7 @@ func New(conf *conf.Mqtt) (mqtt.Client, error) {
 
 	c := mqtt.NewClient(opts)
 	if token := c.Connect(); token.Wait() && token.Error() != nil {
-		log.Sugar.Error("mqtt connect failed:%s", token.Error())
+		log.Sugar.Errorf("mqtt connect failed:%s", token.Error())
 		return nil, token.Error()
 	}
 	return c, nil

@@ -1,11 +1,10 @@
 package model
 
 import (
-	"fmt"
 	"giot/internal/virtual/device"
 	"giot/utils/consts"
 	"giot/utils/encoding"
-	"github.com/panjf2000/gnet/v2"
+	"github.com/panjf2000/gnet"
 	"github.com/shopspring/decimal"
 	"strconv"
 	"strings"
@@ -136,6 +135,7 @@ type Device struct {
 	GroupId      int      `json:"groupId"`
 	FCode        *Ft      `json:"fCode"`
 	Salve        []*Slave `json:"salve"`
+	Address      string   `json:"address"`
 }
 
 func (device *Device) IsType() bool {
@@ -171,12 +171,17 @@ type Ft struct {
 }
 
 type Slave struct {
-	SlaveId    byte      `json:"slaveId"`
-	SlaveName  string    `json:"slaveName"`
-	Alarm      *Alarm    `json:"alarm"`
-	DataTime   time.Time `json:"dataTime"`
-	LineStatus string    `json:"lineStatus"`
-	Precision  int       `json:"precision"`
+	SlaveId      byte      `json:"slaveId"`
+	SlaveName    string    `json:"slaveName"`
+	Alarm        *Alarm    `json:"alarm"`
+	DataTime     time.Time `json:"dataTime"`
+	LineStatus   string    `json:"lineStatus"`
+	Precision    int       `json:"precision"`
+	PropertyUnit string    `json:"propertyUnit"`
+	PropertyName string    `json:"propertyName"`
+	Status       int       `json:"status"`
+	AlarmTime    time.Time `json:"alarmTime"`
+	SaveTime     time.Time `json:"saveTime"`
 }
 
 type Comm int8
@@ -200,9 +205,10 @@ type DeviceChange struct {
 }
 
 type Interface interface {
-	AlarmRule(slaveId byte, point int, data []byte, fcode uint8, info *Device)
-	Trigger(slaveId byte, point int, data []byte, info *Device)
-	Action(guid, status string, level int, data float64, slaveId byte, groupId int)
+	AlarmRule(slave *Slave, data []byte, fcode uint8, info *Device)
+	Trigger(slave *Slave, data []byte, info *Device)
+	Action(guid, status string, level int, data float64, slaveId byte, groupId int, slaveName string, unit string, propertyName string)
+	execute(slave *Slave, status string, level int, data float64, info *Device)
 }
 
 type Alarm struct {
@@ -210,52 +216,124 @@ type Alarm struct {
 	ShakeLimit *ShakeLimit `json:"shakeLimit"` //防抖动配置
 }
 
-func (engine *Alarm) AlarmRule(slaveId byte, point int, data []byte, fcode uint8, info *Device) {
+func (engine *Alarm) execute(slave *Slave, status string, level int, data float64, info *Device) {
+	if status == consts.ALARM { //逻辑判断 1状态未告警2上次数据状态未正常||上次报警时间比大于等于当前时间5分钟以上
+		if status == consts.ALARM && (slave.Status == 0 || time.Now().Sub(slave.AlarmTime) >= 5*time.Minute) {
+			device.AlarmChan <- &device.DeviceMsg{
+				Ts:           time.Now(),
+				DataType:     consts.ALARM,
+				Name:         info.Name,
+				Address:      info.Address,
+				Level:        level,
+				DeviceId:     info.GuId,
+				SlaveId:      int(slave.SlaveId),
+				Data:         data,
+				GroupId:      info.GroupId,
+				SlaveName:    slave.SlaveName,
+				Unit:         slave.PropertyUnit,
+				PropertyName: slave.PropertyName,
+			}
+			slave.Status = 1 //数据状态改为报警
+			slave.AlarmTime = time.Now()
+			slave.SaveTime = time.Now()
+			device.DataChan <- &device.DeviceMsg{
+				Ts:       time.Now(),
+				DataType: consts.DATA,
+				Level:    level,
+				DeviceId: info.GuId,
+				SlaveId:  int(slave.SlaveId),
+				Data:     data,
+				GroupId:  info.GroupId,
+			}
+		}
+	} else {
+		if slave.Status == 1 || time.Now().Sub(slave.SaveTime) >= 15*time.Minute { //如果上次上报数据未报警｜｜正常数据15分钟存储一次
+			slave.SaveTime = time.Now()
+			slave.Status = 0 //数据状态改为正常
+			device.DataChan <- &device.DeviceMsg{
+				Ts:       time.Now(),
+				DataType: consts.DATA,
+				Level:    level,
+				DeviceId: info.GuId,
+				SlaveId:  int(slave.SlaveId),
+				Data:     data,
+				GroupId:  info.GroupId,
+			}
+		}
+		//实时数据
+		device.LastChan <- &device.DeviceMsg{
+			Ts:       time.Now(),
+			DataType: consts.DATA,
+			Level:    level,
+			DeviceId: info.GuId,
+			SlaveId:  int(slave.SlaveId),
+			Data:     data,
+			GroupId:  info.GroupId,
+		}
+
+	}
+
+}
+func (engine *Alarm) AlarmRule(slave *Slave, data []byte, fcode uint8, info *Device) {
 	value := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
 	if info.IsType() {
-		switch value { //是否工业产品
-		// 10000     探测器内部错误
-		case consts.InternalError:
-			engine.Action(info.GuId, consts.ALARM, consts.Internal, 0, slaveId, info.GroupId)
-			break
+		if value >= 10000 {
+			switch value { //是否工业产品
+			// 10000     探测器内部错误
+			case consts.InternalError:
+				engine.execute(slave, consts.HITCH, consts.Internal, 0, info)
+				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.Internal, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
+				return
 
-		// 20000     通讯错误
-		case consts.CommunicationError:
-			engine.Action(info.GuId, consts.ALARM, consts.Communication, 0, slaveId, info.GroupId)
-			break
+			// 20000     通讯错误
+			case consts.CommunicationError:
+				engine.execute(slave, consts.HITCH, consts.Communication, 0, info)
+				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.Communication, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
+				return
 
-		// 30000     主机未连接探测器、主机屏蔽探测器
-		case consts.ShieldError:
-			engine.Action(info.GuId, consts.ALARM, consts.Shield, 0, slaveId, info.GroupId)
-			break
+			// 30000     主机未连接探测器、主机屏蔽探测器
+			case consts.ShieldError:
+				engine.execute(slave, consts.HITCH, consts.Shield, 0, info)
+				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.Shield, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
+				return
 
-			// 65535     探头故障
-		case consts.SlaveHitchError:
-			engine.Action(info.GuId, consts.ALARM, consts.SlaveHitch, 0, slaveId, info.GroupId)
-			break
+				// 65535     探头故障
+			case consts.SlaveHitchError:
+				engine.execute(slave, consts.HITCH, consts.SlaveHitch, 0, info)
+				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.SlaveHitch, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
+				return
+			}
+		} else {
+			engine.Trigger(slave, data, info)
 		}
-		engine.Trigger(slaveId, point, data, info)
+
 	} else {
 		switch fcode {
 		case consts.ReadCode:
-			engine.Trigger(slaveId, point, data, info)
-			break
+			engine.Trigger(slave, data, info)
+			return
 		case consts.HomeHitchError:
 			//故障（若为0，是传感器低故障报警，若为1，是传感器高故障报警，若为2，是传感器寿命报警）
 			if value == 0 { //若为0，是传感器低故障报警
-				engine.Action(info.GuId, consts.ALARM, consts.LowHitch, 0, slaveId, info.GroupId)
+				engine.execute(slave, consts.HITCH, consts.LowHitch, 0, info)
 			} else if value == 1 { //若为1，是传感器高故障报警
-				engine.Action(info.GuId, consts.ALARM, consts.HighHitch, 0, slaveId, info.GroupId)
+				engine.execute(slave, consts.HITCH, consts.HighHitch, 0, info)
 			} else if value == 2 { //若为2，是传感器寿命报警
-				engine.Action(info.GuId, consts.ALARM, consts.Life, 0, slaveId, info.GroupId)
+				engine.execute(slave, consts.HITCH, consts.Life, 0, info)
 			}
-			break
+			return
 		case consts.HomeHighError:
-			engine.Action(info.GuId, consts.ALARM, consts.High, 0, slaveId, info.GroupId)
-			break
+			data := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
+			in := decimal.NewFromInt32(int32(data))
+			value, _ := in.Float64()
+			engine.execute(slave, consts.ALARM, consts.High, value, info)
+			return
 		case consts.HomeLowError:
-			engine.Action(info.GuId, consts.ALARM, consts.Low, 0, slaveId, info.GroupId)
-			break
+			data := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
+			in := decimal.NewFromInt32(int32(data))
+			value, _ := in.Float64()
+			engine.execute(slave, consts.ALARM, consts.High, value, info)
+			return
 		}
 
 	}
@@ -276,15 +354,14 @@ func floating(point int, data []byte) (val string) {
 	}
 	return
 }
-func (engine *Alarm) Trigger(slaveId byte, point int, data []byte, info *Device) {
+func (engine *Alarm) Trigger(slave *Slave, data []byte, info *Device) {
 
-	if point > 0 {
-		str := floating(point, data)
-		fmt.Printf("没有转---->string:%v", data)
+	if slave.Precision > 0 {
+		str := floating(slave.Precision, data)
 		dec, err := decimal.NewFromString(str)
-		fmt.Printf("转成---->decimal:%v", data)
+
 		value, _ := dec.Float64()
-		fmt.Printf("转成---->Float64:%v", value)
+
 		if err != nil {
 			return
 		}
@@ -294,38 +371,37 @@ func (engine *Alarm) Trigger(slaveId byte, point int, data []byte, info *Device)
 			case consts.EQ: //=
 
 				if dec.Equal(filter) {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.NOT:
 				if !dec.Equal(filter) {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.GT:
 				if dec.GreaterThan(filter) {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.LT:
 				if dec.LessThan(filter) {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.GTE:
 				if dec.GreaterThanOrEqual(filter) {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.LTE:
 				if dec.LessThanOrEqual(filter) {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			}
 		}
-
-		engine.Action(info.GuId, consts.DATA, consts.Normal, value, slaveId, info.GroupId)
+		engine.execute(slave, consts.DATA, consts.Normal, value, info)
 
 	} else {
 		data := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
@@ -335,63 +411,37 @@ func (engine *Alarm) Trigger(slaveId byte, point int, data []byte, info *Device)
 			switch trigger.Operator { //TODO 判断比对条件(任意) 触发条件满足条件中任意一个即可触发  高报优先
 			case consts.EQ: //=
 				if data == trigger.FilterValue {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.NOT:
 				if data != trigger.FilterValue {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.GT:
 				if data > trigger.FilterValue {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.LT:
 				if data < trigger.FilterValue {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.GTE:
 				if data >= trigger.FilterValue {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			case consts.LTE:
 				if data <= trigger.FilterValue {
-					engine.Action(info.GuId, consts.ALARM, trigger.Level, value, slaveId, info.GroupId)
+					engine.execute(slave, consts.ALARM, trigger.Level, value, info)
 					return
 				}
 			}
 		}
-
-		engine.Action(info.GuId, consts.DATA, consts.Normal, value, slaveId, info.GroupId)
-	}
-
-}
-
-func (engine *Alarm) Action(guid, status string, level int, data float64, slaveId byte, groupId int) {
-
-	device.DataChan <- &device.DeviceMsg{
-		Ts:       time.Now(),
-		DataType: consts.DATA,
-		Level:    level,
-		DeviceId: guid,
-		SlaveId:  int(slaveId),
-		Data:     data,
-		GroupId:  groupId,
-	}
-	if status == consts.ALARM {
-		device.AlarmChan <- &device.DeviceMsg{
-			Ts:       time.Now(),
-			DataType: consts.ALARM,
-			Level:    level,
-			DeviceId: guid,
-			SlaveId:  int(slaveId),
-			Data:     data,
-			GroupId:  groupId,
-		}
+		engine.execute(slave, consts.DATA, consts.Normal, value, info)
 	}
 
 }

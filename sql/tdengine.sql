@@ -37,5 +37,5 @@ CREATE STABLE if not exists dory_device.device_alarm  (ts timestamp,gas float, a
 CREATE STABLE if not exists dory_device.device_alarm  (ts timestamp,data float, level int) TAGS( device_id binary(30),slave_id int,group_id bigint);
 
 
---创建通知表
-CREATE STABLE if not exists dory_device.device_notify  (ts timestamp,notify_type binary(10),phone_Number binary(30)) TAGS(product_id binary(30), device_id binary(30),alarm_id binary(30),template_id binary(30));
+--创建通知表 字段：时间戳、告警级别、通知方式、电话号码
+CREATE STABLE if not exists dory_device.device_notify  (ts timestamp,level int,notify_type int,notify_number binary(30)) TAGS(user_id bigint);

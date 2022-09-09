@@ -3,8 +3,8 @@ package wheelTimer
 import (
 	"fmt"
 	"github.com/RussellLuo/timingwheel"
+	"github.com/panjf2000/gnet"
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
-	"github.com/panjf2000/gnet/v2"
 	"sync"
 	"time"
 )
@@ -32,7 +32,7 @@ func (t *SyncTimer) Execute() {
 	for _, v := range t.Directives {
 		fmt.Printf("时间:%v——--->任务下发:%X\n", time.Now().Format("2006-01-02 15:04:05"), v)
 
-		t.Conn.AsyncWrite(v, nil)
+		t.Conn.AsyncWrite(v)
 		time.Sleep(300 * time.Millisecond)
 	}
 }
@@ -45,14 +45,18 @@ func NewTimer() *timingwheel.TimingWheel {
 
 type DeviceScheduler struct {
 	Interval time.Duration
+	current  int
+	Rew      string
 }
 
 func (s *DeviceScheduler) Next(prev time.Time) time.Time {
+	fmt.Printf("定时任务:%v:%v--->%v\n", s.Rew, s.current, s.Interval)
+	s.current += 1
 	return prev.Add(s.Interval)
 }
 
 func scheduleTimer() *timingwheel.TimingWheel {
-	tw := timingwheel.NewTimingWheel(time.Second, 20)
+	tw := timingwheel.NewTimingWheel(time.Second, 3600)
 	return tw
 }
 

@@ -11,17 +11,19 @@ import (
 )
 
 type DeviceMsg struct {
-	Ts        time.Time `json:"timestamp"`
-	DataType  string    `json:"dataType"`
-	Level     int       `json:"level"`
-	DeviceId  string    `json:"deviceId"`
-	GroupId   int       `json:"groupId"`
-	Status    string    `json:"status"`
-	Name      string    `json:"name" `
-	SlaveId   int       `json:"slaveId"`
-	SlaveName string    `json:"slaveName"`
-	Address   string    `json:"address"`
-	Data      float64   `json:"data"`
+	Ts           time.Time `json:"ts"`
+	DataType     string    `json:"dataType"`
+	Level        int       `json:"level"`
+	DeviceId     string    `json:"deviceId"`
+	GroupId      int       `json:"groupId"`
+	Status       string    `json:"status"`
+	Name         string    `json:"name" `
+	SlaveId      int       `json:"slaveId"`
+	SlaveName    string    `json:"slaveName"`
+	Address      string    `json:"address"`
+	Data         float64   `json:"data"`
+	Unit         string    `json:"unit"`
+	PropertyName string    `json:"propertyName"`
 }
 
 // Change max partitions as you need.

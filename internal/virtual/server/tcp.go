@@ -8,7 +8,7 @@ import (
 	"giot/internal/virtual/device"
 	"giot/internal/virtual/tcp"
 	"giot/pkg/log"
-	"github.com/panjf2000/gnet/v2"
+	"github.com/panjf2000/gnet"
 
 	"time"
 )
@@ -28,7 +28,7 @@ func (s *server) setupTcp() {
 	go pro.Swift(t.RegisterChan)
 	go pro.Handle(t.DataChan)
 	go pro.ListenCommand(t.ListenMsgChan)
-	log.Sugar.Fatalf("gent tcp event loop start failed: %v", gnet.Run(t, fmt.Sprintf("tcp://%v", config.Addr), gnet.WithMulticore(config.Multicore), gnet.WithTCPKeepAlive(5*time.Second), gnet.WithReusePort(config.Reuseport)))
+	log.Sugar.Fatalf("gent tcp event loop start failed: %v", gnet.Serve(t, fmt.Sprintf("tcp://%v", config.Addr), gnet.WithMulticore(config.Multicore), gnet.WithLockOSThread(true), gnet.WithTCPKeepAlive(5*time.Minute), gnet.WithReusePort(config.Reuseport)))
 }
 
 func (s *server) shutdown() error {

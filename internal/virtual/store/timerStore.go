@@ -6,7 +6,7 @@ import (
 	"giot/internal/virtual/wheelTimer"
 	"giot/pkg/log"
 	cmap "github.com/orcaman/concurrent-map"
-	"github.com/panjf2000/gnet/v2"
+	"github.com/panjf2000/gnet"
 	"github.com/shiningrush/droplet/data"
 )
 

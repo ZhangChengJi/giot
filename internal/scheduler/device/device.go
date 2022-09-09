@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"giot/internal/model"
+	"giot/internal/scheduler/line"
 	"giot/pkg/etcd"
 	"giot/pkg/log"
 	"giot/pkg/modbus"
 	"giot/utils/consts"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/go-redis/redis"
 	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
 	"reflect"
@@ -24,6 +26,15 @@ var (
 	DEVICE_PASSIVE = 2 //服务器采集
 	F03H           = 3 //03功能
 	F04H           = 4 //04功能
+	TIMER1_SECOND  = 1 * time.Second
+	TIMER2_SECOND  = 2 * time.Second
+	TIMER3_SECOND  = 3 * time.Second
+	TIMER4_SECOND  = 4 * time.Second
+	TIMER5_SECOND  = 5 * time.Second
+	TIMER6_SECOND  = 6 * time.Second
+	TIMER7_SECOND  = 7 * time.Second
+	TIMER8_SECOND  = 8 * time.Second
+	TIMER9_SECOND  = 9 * time.Second
 	TIMER10_SECOND = 10 * time.Second
 	TIMER20_SECOND = 20 * time.Second
 	TIMER30_SECOND = 30 * time.Second
@@ -38,14 +49,16 @@ type Device struct {
 	etcd    etcd.Interface
 	db      *gorm.DB
 	mqtt    mqtt.Client
+	li      line.LineCache
 }
 
-func Setup(Etcd etcd.Interface, Db *gorm.DB, mqtt mqtt.Client) error {
+func Setup(Etcd etcd.Interface, Db *gorm.DB, mqtt mqtt.Client, redis *redis.Client) error {
 	device := &Device{
 		modbuls: modbus.NewClient(&modbus.RtuHandler{}),
 		etcd:    Etcd,
 		db:      Db,
 		mqtt:    mqtt,
+		li:      &line.Line{Re: redis},
 	}
 
 	err := device.deviceLoad()
@@ -56,6 +69,11 @@ func Setup(Etcd etcd.Interface, Db *gorm.DB, mqtt mqtt.Client) error {
 	return err
 
 }
+func (device *Device) clearAllOnline() {
+	device.li.ClearAll()
+}
+
+//监听设备发生配置变化
 func (device *Device) DeviceLister() error {
 	if token := device.mqtt.Subscribe("device/change", 0, func(client mqtt.Client, message mqtt.Message) {
 		var changeData model.DeviceChange
@@ -120,13 +138,17 @@ func (device *Device) DeviceLister() error {
 
 func (device *Device) deviceLoad() error {
 	log.Sugar.Info("Initialize device load.....")
+	log.Sugar.Info("清理之前的在线状态")
+	device.clearAllOnline()
 	size := 100
 	page := 1
+	log.Sugar.Info("删除之前的元数据")
 	device.etcd.DeleteWithPrefix(context.TODO(), "device/")
 	var devices []*model.PigDevice
 	var cou int64
 	device.db.Model(devices).Count(&cou)
 	bar := progressbar.Default(cou)
+
 	for {
 		offset := size * (page - 1)
 		err := device.db.Offset(offset).Limit(size).Find(&devices).Error //查询设备
@@ -168,7 +190,9 @@ func (device *Device) deviceLoad() error {
 				BindStatus:  d.BindStatus,
 				LineStatus:  d.LineStatus,
 				GroupId:     d.GroupId,
+				Address:     d.DeviceAddress,
 			}
+
 			if !reflect.DeepEqual(devic, model.Device{}) { //etcd device
 				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 				data, _ := json.Marshal(devic)
@@ -179,8 +203,8 @@ func (device *Device) deviceLoad() error {
 				}
 			}
 		}
-
 	}
+
 	return nil
 }
 
@@ -195,7 +219,7 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 	var already bool
 	//30s 指令
 	if instruct && !already { //单
-		err := device.createF1Active(ta, 3, 5)
+		err := device.createF1Active(ta, 3, len(deviceSlaves))
 		if err != nil {
 			return nil, err
 		}
@@ -211,9 +235,11 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 		}
 
 		slave := &model.Slave{
-			SlaveId:   byte(s.ModbusAddress),
-			SlaveName: s.SlaveName,
-			Precision: property.PropertyPrecision,
+			SlaveId:      byte(s.ModbusAddress),
+			SlaveName:    s.SlaveName,
+			Precision:    property.PropertyPrecision,
+			PropertyUnit: property.PropertyUnit,
+			PropertyName: property.PropertyName,
 		}
 		if !reflect.DeepEqual(property, model.PigProperty{}) {
 
@@ -261,7 +287,7 @@ func (device *Device) getSalve(guid string, ta *model.TimerActive, instruct bool
 // createActive  创建动态指令
 func (device *Device) createActive(ta *model.TimerActive, code, salveId int, propertyRegister int) error {
 	tc := &tCode{}
-	err := tc.crateTimerCode(TIMER20_SECOND, ta).functionCode(code, device.modbuls, byte(salveId), uint16(propertyRegister))
+	err := tc.crateTimerCode(TIMER30_SECOND, ta).functionCode(code, device.modbuls, byte(salveId), uint16(propertyRegister))
 	if err != nil {
 		return err
 	}
@@ -270,7 +296,7 @@ func (device *Device) createActive(ta *model.TimerActive, code, salveId int, pro
 }
 func (device *Device) createF1Active(ta *model.TimerActive, code, salveSize int) error {
 	tc := &tCode{}
-	err := tc.crateTimerCode(TIMER20_SECOND, ta).functionCode(code, device.modbuls, byte(241), uint16(salveSize))
+	err := tc.crateTimerCode(TIMER30_SECOND, ta).functionCode(code, device.modbuls, byte(241), uint16(salveSize))
 	if err != nil {
 		return err
 	}

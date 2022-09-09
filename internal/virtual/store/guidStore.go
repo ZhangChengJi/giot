@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"giot/pkg/log"
 	cmap "github.com/orcaman/concurrent-map"
 	"github.com/shiningrush/droplet/data"
 )
@@ -30,7 +29,7 @@ func (t *GuidStore) Get(ctx context.Context, key string) (string, error) {
 	if tmp, ok := t.cache.Get(key); ok {
 		return tmp.(string), nil
 	} else {
-		log.Sugar.Warnf("data not found by key: %s", key)
+		//log.Sugar.Warnf("data not found by key: %s", key)
 		return "", data.ErrNotFound
 	}
 }

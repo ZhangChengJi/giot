@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"giot/internal/model"
 	"giot/internal/virtual/device"
-	"giot/internal/virtual/lineTimer"
+	"giot/internal/virtual/mqtt"
+	"giot/internal/virtual/offline"
 	"giot/internal/virtual/store"
 	"giot/internal/virtual/wheelTimer"
 	"giot/pkg/etcd"
@@ -22,19 +23,20 @@ import (
 )
 
 type Processor struct {
-	modbus      modbus.Client
-	Stg         etcd.Interface
-	Timer       *timingwheel.TimingWheel
-	TimerStore  store.DeviceTimerIn
-	LineStore   lineTimer.LineStoreIn
-	guidStore   store.GuidStoreIn
-	slaveStore  store.SlaveStoreIn
-	deviceStore store.DeviceStoreIn
-	workerPool  *goroutine.Pool
+	modbus     modbus.Client
+	Stg        etcd.Interface
+	Timer      *timingwheel.TimingWheel
+	TimerStore store.DeviceTimerIn
+	//LineStore   lineTimer.LineStoreIn
+	guidStore    store.GuidStoreIn
+	slaveStore   store.SlaveStoreIn
+	deviceStore  store.DeviceStoreIn
+	offlineStore offline.LineStoreIn
+	workerPool   *goroutine.Pool
 }
 
 func NewProcessor() *Processor {
-	processor := &Processor{modbus: modbus.NewClient(&modbus.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Timer: wheelTimer.NewTimer(), TimerStore: store.NewTimerStore(), LineStore: lineTimer.NewLineStore(), guidStore: store.NewGuidStore(), slaveStore: store.NewSlaveStore(), deviceStore: store.NewDeviceStore(), workerPool: goroutine.Default()}
+	processor := &Processor{modbus: modbus.NewClient(&modbus.RtuHandler{}), Stg: etcd.GenEtcdStorage(), Timer: wheelTimer.NewTimer(), TimerStore: store.NewTimerStore(), guidStore: store.NewGuidStore(), slaveStore: store.NewSlaveStore(), deviceStore: store.NewDeviceStore(), offlineStore: offline.NewLineStore(), workerPool: goroutine.Default()}
 	go processor.watchPoolEtcd()
 	go processor.debug()
 	return processor
@@ -58,7 +60,6 @@ func (p *Processor) Swift(reg chan *model.RegisterData) {
 		select {
 		case re := <-reg:
 			p.register(re)
-
 		case <-time.After(200 * time.Millisecond):
 			//等待缓冲
 		}
@@ -80,7 +81,7 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 				}
 			} else {
 				re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Error)
-				data.Conn.Write(re)
+				data.Conn.AsyncWrite(re)
 				data.Conn.Close()
 				fmt.Println("未注册强制断开连接")
 			}
@@ -92,15 +93,18 @@ func (p *Processor) Handle(da chan *model.RemoteData) {
 
 func (p *Processor) protocol(info *model.Device, remoteAddr string, frame []byte) (results []*modbus.ProtocolDataUnit, err error) {
 
-	//var result *modbus.ProtocolDataUnit
 	fmt.Printf("时间:%v——--->指令上报:%X\n", time.Now().Format("2006-01-02 15:04:05"), frame)
 	if info.IsType() { //是否是工业产品
 		if info.IsInstruct() { //是否是单指令下发
 			results, err = p.modbus.ReadIndustryF1Code(frame)
+		} else {
+			result, err := p.modbus.ReadIndustryCode(frame) //解码
+			if err == nil {
+				results = append(results, result)
+			}
 		}
+
 	} else {
-		//result, err = p.modbus.ReadIndustryCode(frame) //解码
-		//results = append(results, result)
 
 		//} else {
 		//	result, err = p.modbus.ReadHomeCode(frame) //解码
@@ -120,7 +124,7 @@ func (p *Processor) alarmFilter(remoteAddr string, result *modbus.ProtocolDataUn
 			device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.ONLINE, DeviceId: info.GuId, SlaveId: int(slave.SlaveId)}
 		}
 		//
-		slave.Alarm.AlarmRule(slave.SlaveId, slave.Precision, result.Data, result.FunctionCode, info)
+		slave.Alarm.AlarmRule(slave, result.Data, result.FunctionCode, info)
 	} else {
 		log.Sugar.Errorf("salve:%v not found", result.SlaveId)
 	}
@@ -130,7 +134,7 @@ func (p *Processor) ListenCommand(msg chan *model.ListenMsg) {
 		select {
 		case m := <-msg:
 			if m.ListenType == 1 { //1代表tcp 任务
-				p.deleteTask(m.RemoteAddr)
+				p.DeleteTask(m.RemoteAddr)
 
 			} else {
 			}
@@ -139,8 +143,7 @@ func (p *Processor) ListenCommand(msg chan *model.ListenMsg) {
 		}
 	}
 }
-func (p *Processor) deleteTask(remoteAddr string) {
-
+func (p *Processor) DeleteTask(remoteAddr string) {
 	timer, err := p.TimerStore.Get(context.TODO(), remoteAddr)
 	if err != nil {
 		return
@@ -148,18 +151,12 @@ func (p *Processor) deleteTask(remoteAddr string) {
 	if timer != nil {
 		p.guidStore.Delete(context.TODO(), timer.Guid) //远程地址和guid对应关系删除
 	}
-
 	timer.T.Stop()
-	timer.Conn.Close() //TODO 强制关闭连接是否有必要?
-	line, err := p.LineStore.Get(context.TODO(), remoteAddr)
-	if err != nil {
-		return
-	}
-	line.T.Stop()
-	p.TimerStore.Delete(context.TODO(), remoteAddr)  //定时删除
-	p.LineStore.Delete(context.TODO(), remoteAddr)   //删除slave在线检查
-	p.slaveStore.Delete(context.TODO(), remoteAddr)  //从机删除
-	p.deviceStore.Delete(context.TODO(), remoteAddr) //设备数据删除
+	timer.Conn.Close()                                //TODO 强制关闭连接是否有必要?
+	p.offlineStore.Delete(context.TODO(), remoteAddr) //上下线任务检测删除
+	p.TimerStore.Delete(context.TODO(), remoteAddr)   //定时删除
+	p.slaveStore.Delete(context.TODO(), remoteAddr)   //从机删除
+	p.deviceStore.Delete(context.TODO(), remoteAddr)  //设备数据删除
 	device.OnlineChan <- &device.DeviceMsg{Ts: time.Now(), Status: consts.OFFLINE, DeviceId: timer.Guid}
 
 }
@@ -198,7 +195,7 @@ func (p *Processor) watchPoolEtcd() {
 					}
 					log.Sugar.Infof("etcd device data key:%v ,delete...", event.Events[i].Key)
 
-					p.deleteTask(remoteAddr)
+					p.DeleteTask(remoteAddr)
 				}
 			}
 		}
@@ -224,11 +221,7 @@ func (p *Processor) activeStore(guid, val string) error {
 		return err
 	}
 	timers.T.Stop()
-	line, err := p.LineStore.Get(context.TODO(), remoteAddr)
-	if err != nil {
-		return err
-	}
-	line.T.Stop()
+
 	if de.FCode != nil {
 		task := &wheelTimer.SyncTimer{
 			Guid:       de.GuId,
@@ -237,18 +230,9 @@ func (p *Processor) activeStore(guid, val string) error {
 			Time:       de.FCode.Tm,
 			Directives: de.FCode.FCode,
 		}
-		task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time}, task.Execute)
+		task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time, Rew: de.GuId}, task.Execute)
 		p.TimerStore.Update(context.TODO(), remoteAddr, task)
 	}
-
-	lineTask := &lineTimer.LineTimer{
-		Guid:       guid,
-		RemoteAddr: remoteAddr,
-		Time:       de.FCode.Tm + 15*time.Second,
-		SlaveStore: p.slaveStore,
-	}
-	lineTask.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: lineTask.Time}, lineTask.Execute)
-	p.LineStore.Update(context.TODO(), remoteAddr, lineTask)
 
 	p.slaveStore.Update(context.TODO(), remoteAddr, de.Salve)
 
@@ -260,9 +244,22 @@ func (p *Processor) activeStore(guid, val string) error {
 		Instruct:     de.Instruct,
 		LineStatus:   de.LineStatus,
 		GroupId:      de.GroupId,
+		Address:      de.Address,
 	}
 	p.deviceStore.Update(context.TODO(), remoteAddr, deviceInfo)
-
+	line := &offline.LineTimer{
+		Guid:       de.GuId,
+		Status:     1,
+		Time:       60 * time.Second,
+		GuidStore:  p.guidStore,
+		SlaveStore: p.slaveStore,
+		MqttBroker: mqtt.Broker{
+			Client: mqtt.Client,
+		},
+		DeleteMsg: p.DeleteTask,
+	}
+	line.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: 60 * time.Second}, line.Execute)
+	p.offlineStore.Update(context.TODO(), remoteAddr, line)
 	return nil
 }
 
@@ -277,7 +274,7 @@ func (p *Processor) register(data *model.RegisterData) {
 	if wt, err := p.guidStore.Get(context.TODO(), data.D); err == nil {
 		if remoteAddr == wt {
 			re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Success)
-			data.Conn.AsyncWrite(re, nil)
+			data.Conn.AsyncWrite(re)
 			log.Sugar.Warnf("remoteAddr:%s alike no need to register again", remoteAddr)
 
 			return
@@ -292,7 +289,7 @@ func (p *Processor) register(data *model.RegisterData) {
 	val, err := p.Stg.Get(context.Background(), "device/"+guid)
 	if err != nil {
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Error)
-		data.Conn.AsyncWrite(re, nil)
+		data.Conn.AsyncWrite(re)
 		data.Conn.Close()
 		log.Sugar.Warnf("guid:%v metadata not found.", guid)
 		log4j.Printf("guid:%v remoteAddr:%v注册失败，无法查询到元数据", guid, remoteAddr)
@@ -303,7 +300,7 @@ func (p *Processor) register(data *model.RegisterData) {
 	if len(val) > 0 {
 		de, err := metaDataCompile(val)
 		re, _ := p.modbus.WriteSingleRegister(1, 1, 1, modbus.Success)
-		data.Conn.AsyncWrite(re, nil)
+		data.Conn.AsyncWrite(re)
 		if err != nil {
 			log.Sugar.Errorf("guid:%v transfer metadata transform error.", guid)
 			return
@@ -319,17 +316,17 @@ func (p *Processor) register(data *model.RegisterData) {
 				Time:       de.FCode.Tm,
 				Directives: de.FCode.FCode,
 			}
-			task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time}, task.Execute)
+			task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time, Rew: de.GuId}, task.Execute)
 		}
 
-		lineTask := &lineTimer.LineTimer{
-			Guid:       guid,
-			RemoteAddr: remoteAddr,
-			Time:       de.FCode.Tm + 15*time.Second,
+		line := &offline.LineTimer{
+			Guid:       de.GuId,
+			Status:     1,
+			Time:       60 * time.Second,
+			GuidStore:  p.guidStore,
 			SlaveStore: p.slaveStore,
 		}
-		lineTask.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: lineTask.Time}, lineTask.Execute)
-
+		line.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: 60 * time.Second}, line.Execute)
 		//先存储一下guid和远程地址对应关系
 		p.guidStore.Create(context.TODO(), guid, remoteAddr)
 		deviceInfo := &model.Device{
@@ -340,12 +337,13 @@ func (p *Processor) register(data *model.RegisterData) {
 			Instruct:     de.Instruct,
 			LineStatus:   de.LineStatus,
 			GroupId:      de.GroupId,
+			Address:      de.Address,
 		}
 		if de.FCode != nil {
 			p.TimerStore.Create(context.TODO(), remoteAddr, task)
 		}
-		if lineTask != nil {
-			p.LineStore.Create(context.TODO(), remoteAddr, lineTask)
+		if line != nil {
+			p.offlineStore.Create(context.TODO(), remoteAddr, line)
 		}
 		if len(de.Salve) > 0 {
 			p.slaveStore.Create(context.TODO(), remoteAddr, de.Salve)
@@ -367,7 +365,7 @@ func (p *Processor) debug() {
 			if err == nil {
 				if we, err := p.TimerStore.Get(context.TODO(), addr); err == nil {
 					log.Sugar.Infof("debug指令下发：%v", de.FCode)
-					we.Conn.AsyncWrite(de.FCode, nil)
+					we.Conn.AsyncWrite(de.FCode)
 				}
 			}
 
