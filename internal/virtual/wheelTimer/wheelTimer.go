@@ -4,15 +4,7 @@ import (
 	"fmt"
 	"github.com/RussellLuo/timingwheel"
 	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/pkg/pool/goroutine"
-	"sync"
 	"time"
-)
-
-var (
-	rtr        sync.Map
-	rtp        sync.Map
-	workerPool *goroutine.Pool
 )
 
 type SyncTimer struct {

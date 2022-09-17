@@ -16,6 +16,7 @@ var (
 	DataChan   chan *DeviceMsg
 	LastChan   chan *DeviceMsg
 	AlarmChan  chan *DeviceMsg
+	NotifyChan chan *DeviceMsg
 	OnlineChan chan *DeviceMsg
 	DebugChan  chan *Debug
 )
@@ -33,18 +34,19 @@ type Interface interface {
 	listenLoop()
 	Insert(data *DeviceMsg)
 	InsertAlarm(data *DeviceMsg)
-	Online(data *DeviceMsg)
+	Line(data *DeviceMsg)
 }
 
 func Init() {
 	DataChan = make(chan *DeviceMsg, 1024)
 	AlarmChan = make(chan *DeviceMsg, 1024)
+	NotifyChan = make(chan *DeviceMsg, 1024)
 	OnlineChan = make(chan *DeviceMsg, 1024)
 	LastChan = make(chan *DeviceMsg, 1024)
 	DebugChan = make(chan *Debug)
 	d := &device{mqtt: mqtt.Broker{Client: mqtt.Client}, modbus: modbus.NewClient(&modbus.RtuHandler{})}
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 5; i++ {
 		go d.listenLoop()
 	}
 	go d.Subscribe()
@@ -54,13 +56,16 @@ func Init() {
 func (d *device) listenLoop() {
 	for {
 		select {
-		case data := <-DataChan:
+		case data := <-LastChan: //实时最新数据
+			d.InsertLast(data)
+		case data := <-DataChan: //存储数据
 			d.Insert(data)
-		case data := <-AlarmChan:
+		case data := <-AlarmChan: //告警实时数据
 			d.InsertAlarm(data)
-
-		case data := <-OnlineChan:
-			d.Online(data)
+		case data := <-OnlineChan: //上下线数据
+			d.Line(data)
+		case data := <-NotifyChan: //通知数据
+			d.InsertNotify(data)
 
 		case <-time.After(200 * time.Millisecond):
 		}
@@ -78,19 +83,24 @@ func (d *device) Insert(data *DeviceMsg) {
 }
 func (d *device) InsertLast(data *DeviceMsg) {
 	var buf bytes.Buffer
-	buf.WriteString("device/Last/")
+	buf.WriteString("device/last/")
 	buf.WriteString(data.DeviceId)
 	payload, _ := json.Marshal(data)
 	d.mqtt.Publish(buf.String(), payload)
 
+}
+func (d *device) InsertNotify(data *DeviceMsg) {
+	topic := append([]byte("device/notify/"), data.DeviceId...)
+	payload, _ := json.Marshal(data)
+	d.mqtt.Publish(string(topic), payload)
 }
 func (d *device) InsertAlarm(data *DeviceMsg) {
 	topic := append([]byte("device/alarm/"), data.DeviceId...)
 	payload, _ := json.Marshal(data)
 	d.mqtt.Publish(string(topic), payload)
 }
-func (d *device) Online(data *DeviceMsg) {
-	topic := append([]byte("device/online/"), data.DeviceId...)
+func (d *device) Line(data *DeviceMsg) {
+	topic := append([]byte("device/line/"), data.DeviceId...)
 	payload, _ := json.Marshal(data)
 	d.mqtt.Publish(string(topic), payload)
 }

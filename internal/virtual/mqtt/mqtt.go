@@ -7,7 +7,6 @@ import (
 
 type Broker struct {
 	Client mqtt.Client
-	topic  string
 }
 
 var (

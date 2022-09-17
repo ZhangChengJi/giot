@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"giot/conf"
-	"giot/internal/scheduler/device"
 	"giot/internal/scheduler/transfer"
 	"giot/pkg/etcd"
 	"giot/pkg/gorm"
@@ -65,11 +64,6 @@ func (s *server) init() error {
 		return err
 	}
 	re, err := redis.New(conf.RedisConfig)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	err = device.Setup(etcd.GenEtcdStorage(), db, mq, re)
 	if err != nil {
 		fmt.Println(err)
 		return err

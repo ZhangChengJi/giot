@@ -17,17 +17,17 @@ func (s *server) setupTcp() {
 	config := conf.GnetConfig
 	log.Sugar.Infof("gent tcp event loop started...🚀 🚀 🚀")
 	t := &tcp.TcpServer{
-		DataChan:      make(chan *model.RemoteData),
-		RegisterChan:  make(chan *model.RegisterData),
-		ListenMsgChan: make(chan *model.ListenMsg),
+		DataChan:     make(chan *model.RemoteData, 1024),
+		RegisterChan: make(chan *model.RegisterData, 1024),
 	}
+	tcp.ListenMsgChan = make(chan *model.ListenMsg)
 	pro := NewProcessor()
 	pro.Timer.Start()
 	defer pro.Timer.Stop()
 	device.Init()
 	go pro.Swift(t.RegisterChan)
 	go pro.Handle(t.DataChan)
-	go pro.ListenCommand(t.ListenMsgChan)
+	go pro.ListenCommand(tcp.ListenMsgChan)
 	log.Sugar.Fatalf("gent tcp event loop start failed: %v", gnet.Serve(t, fmt.Sprintf("tcp://%v", config.Addr), gnet.WithMulticore(config.Multicore), gnet.WithLockOSThread(true), gnet.WithTCPKeepAlive(5*time.Minute), gnet.WithReusePort(config.Reuseport)))
 }
 

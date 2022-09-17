@@ -2,8 +2,9 @@ package line
 
 import (
 	"bytes"
+	"context"
 	"giot/utils/consts"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 const (
@@ -41,23 +42,33 @@ func getDeviceCacheName(prefix string) string {
 }
 
 func (l *Line) ClearAll() {
-	l.Re.Del(getWildcardCacheName(consts.LINE_DEVICE)) //删除设备在线状态
-	l.Re.Del(getWildcardCacheName(consts.LINE_DEVICE)) //删除探头在线状态
+	l.Re.Del(context.TODO(), consts.LINE_DEVICE) //删除设备在线状态
+	//删除探头在线状态
+	iter := l.Re.Scan(context.TODO(), 0, getWildcardCacheName(consts.LINE_SLAVE), 0).Iterator()
+	for iter.Next(context.TODO()) {
+		err := l.Re.Del(context.TODO(), iter.Val()).Err()
+		if err != nil {
+			panic(err)
+		}
+	}
+	if err := iter.Err(); err != nil {
+		panic(err)
+	}
 }
 
 // 设置设备在线
 func (l *Line) SetDeviceOnline(deviceId string) {
-	l.Re.HSet(consts.LINE_DEVICE, deviceId, on)
+	l.Re.HSet(context.TODO(), consts.LINE_DEVICE, deviceId, on)
 }
 
 // 设置设备离线
 func (l *Line) SetDeviceOffline(deviceId string) {
-	l.Re.HSet(consts.LINE_DEVICE, deviceId, off)
+	l.Re.HDel(context.TODO(), consts.LINE_DEVICE, deviceId)
 }
 
 // 设置探头在线
 func (l *Line) SetSlaveOnline(deviceId string, slaveId string) {
-	l.Re.HSet(consts.LINE_DEVICE+consts.SYMBOL+deviceId, slaveId, on)
+	l.Re.HSet(context.TODO(), consts.LINE_SLAVE+consts.SYMBOL+deviceId, slaveId, on)
 }
 
 //批量探头在线
@@ -68,11 +79,11 @@ func (l *Line) SetSlaveOnline(deviceId string, slaveId string) {
 
 // 设置探头离线
 func (l *Line) SetSlaveOffline(deviceId string, slaveId string) {
-	l.Re.HDel(consts.LINE_SLAVE+consts.SYMBOL+deviceId, slaveId)
+	l.Re.HDel(context.TODO(), consts.LINE_SLAVE+consts.SYMBOL+deviceId, slaveId)
 }
 
 //批量探头离线
 func (l *Line) BatchSlaveOffline(deviceId string) {
-	l.Re.Del(consts.LINE_SLAVE + consts.SYMBOL + deviceId)
+	l.Re.Del(context.TODO(), consts.LINE_SLAVE+consts.SYMBOL+deviceId)
 
 }

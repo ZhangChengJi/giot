@@ -65,7 +65,7 @@ conf:
   redis:
     addr: 192.168.0.73:6379
     password:
-    db: 1
+    db: 0
                           # yamllint disable rule:comments-indentation
                           # etcd basic auth info
     # username: "root"    # ignore etcd username if not enable etcd auth

@@ -37,17 +37,17 @@ func (PigProduct) TableName() string {
 }
 
 type PigDevice struct {
-	Id               string `gorm:"id" json:"id"`                               // 设备id
-	ProductId        int    `gorm:"product_id" json:"product_id"`               // 产品id
-	DeviceName       string `gorm:"device_name" json:"device_name"`             // 设备名称
-	NetworkFlag      int    `gorm:"network_flag" json:"network_flag"`           // 联网方式 1:4G-DTU 1:NB-IOT
-	InstructFlag     int    `gorm:"instruct_flag" json:"instruct_flag"`         // 指令下发方式 1:单条下发 2:多条下发
-	SimCode          string `gorm:"sim_code" json:"sim_code"`                   // SIM卡ICCID
-	BindStatus       int    `gorm:"bind_status" json:"bind_status"`             // 绑定状态 0:未绑定 1:已绑定
-	LineStatus       int    `gorm:"line_status" json:"line_status"`             // 设备状态: 0:离线 1:在线
-	DeviceAddress    string `gorm:"device_address" json:"device_address"`       // 设备地址
-	DeviceCoordinate string `gorm:"device_coordinate" json:"device_coordinate"` // 设备坐标信息
-	GroupId          int    `gorm:"group_id" json:"group_id"`                   //分组id
+	Id               string `gorm:"id" json:"id"`                              // 设备id
+	ProductId        int    `gorm:"product_id" json:"productId"`               // 产品id
+	DeviceName       string `gorm:"device_name" json:"deviceName"`             // 设备名称
+	NetworkFlag      int    `gorm:"network_flag" json:"networkFlag"`           // 联网方式 1:4G-DTU 1:NB-IOT
+	InstructFlag     int    `gorm:"instruct_flag" json:"instructFlag"`         // 指令下发方式 1:单条下发 2:多条下发
+	SimCode          string `gorm:"sim_code" json:"simCode"`                   // SIM卡ICCID
+	BindStatus       int    `gorm:"bind_status" json:"bindStatus"`             // 绑定状态 0:未绑定 1:已绑定
+	LineStatus       int    `gorm:"line_status" json:"lineStatus"`             // 设备状态: 0:离线 1:在线
+	DeviceAddress    string `gorm:"device_address" json:"deviceAddress"`       // 设备地址
+	DeviceCoordinate string `gorm:"device_coordinate" json:"deviceCoordinate"` // 设备坐标信息
+	GroupId          int    `gorm:"group_id" json:"groupId"`                   //分组id
 
 }
 
@@ -56,18 +56,23 @@ func (PigDevice) TableName() string {
 }
 
 type PigDeviceSlave struct {
+	//从机
 	DeviceId      string `gorm:"device_id" json:"device_id"`           // 设备ID
 	SlaveAlias    string `gorm:"slave_alias" json:"slave_alias"`       // 从机设备别名
 	SlaveName     string `gorm:"slave_name" json:"slave_name"`         // 从机设备名称
 	ModbusAddress int    `gorm:"modbus_address" json:"modbus_address"` // modbus从站地址
 	PropertyId    int    `gorm:"property_id" json:"property_id"`       // 关联设备属性
-	SlaveDesc     string `gorm:"slave_desc" json:"slave_desc"`         // 从机设备描述
-	SlaveStatus   int    `gorm:"slave_status" json:"slave_status"`     // 从机设备开关 0:关闭 1:开启
-	LineStatus    int    `gorm:"line_status" json:"line_status"`       // 从机设备状态 0:离线 1:在线
-	CreateTime    string `gorm:"create_time" json:"create_time"`       // 创建时间
-	UpdateTime    string `gorm:"update_time" json:"update_time"`       // 修改时间
-	CreateBy      string `gorm:"create_by" json:"create_by"`           // 创建者
-	UpdateBy      string `gorm:"update_by" json:"update_by"`           // 更新人
+	//属性
+	PropertyName           string `gorm:"property_name" json:"property_name"`                     // 属性名称
+	PropertyIdentification string `gorm:"property_identification" json:"property_identification"` // 属性标识
+	PropertyDataType       string `gorm:"property_data_type" json:"property_data_type"`           // 数据类型
+	PropertyPrecision      int    `gorm:"property_precision" json:"property_precision"`           //浮点型精度
+	PropertyUnit           string `gorm:"property_unit" json:"property_unit"`                     // 单位
+	PropertyRegister       int    `gorm:"property_register" json:"property_register"`             // 寄存器
+	AddressOffset          int    `gorm:"address_offset" json:"address_offset"`                   // 地址偏移
+	//告警条件
+	AlarmRule string `gorm:"alarm_rule" json:"alarm_rule"` // 告警条件
+
 }
 
 func (PigDeviceSlave) TableName() string {
@@ -122,6 +127,19 @@ type ShakeLimit struct { //防抖
 	Handle    string `json:"Handle"`    //是否第一次满足条件就触发
 
 }
+type DeviceInfoData struct {
+	GuId         string   `json:"guid"`
+	Name         string   `json:"name"`
+	ProductType  int      `json:"productType"`
+	ProductModel string   `json:"productModel"`
+	BindStatus   int      `json:"bindStatus"`
+	Instruct     int      `json:"instruct"`
+	LineStatus   int      `json:"lineStatus"`
+	GroupId      int      `json:"groupId"`
+	FCode        *Ft      `json:"fCode"`
+	Salve        []*Slave `json:"salve"`
+	Address      string   `json:"address"`
+}
 
 // Device 结构体
 type Device struct {
@@ -171,17 +189,19 @@ type Ft struct {
 }
 
 type Slave struct {
-	SlaveId      byte      `json:"slaveId"`
-	SlaveName    string    `json:"slaveName"`
-	Alarm        *Alarm    `json:"alarm"`
-	DataTime     time.Time `json:"dataTime"`
-	LineStatus   string    `json:"lineStatus"`
-	Precision    int       `json:"precision"`
-	PropertyUnit string    `json:"propertyUnit"`
-	PropertyName string    `json:"propertyName"`
-	Status       int       `json:"status"`
-	AlarmTime    time.Time `json:"alarmTime"`
-	SaveTime     time.Time `json:"saveTime"`
+	SlaveId          byte      `json:"slaveId"`
+	SlaveName        string    `json:"slaveName"`
+	Rule             *Rule     `json:"rule"`
+	DataTime         time.Time `json:"dataTime"`
+	LineStatus       string    `json:"lineStatus"`
+	Precision        int       `json:"precision"`
+	PropertyUnit     string    `json:"propertyUnit"`
+	PropertyName     string    `json:"propertyName"`
+	PropertyRegister int       `json:"propertyRegister"` // 寄存器
+	AddressOffset    int       `json:"addressOffset"`    // 地址偏移
+	Status           int       `json:"status"`
+	AlarmTime        time.Time `json:"alarmTime"`
+	SaveTime         time.Time `json:"saveTime"`
 }
 
 type Comm int8
@@ -200,40 +220,41 @@ func Level(a int) string {
 }
 
 type DeviceChange struct {
-	ChangeType string `json:"changeType"`
 	DeviceId   string `json:"deviceId"`
+	Action     string `json:"action"`
+	ChangeType string `json:"changeType"`
 }
 
 type Interface interface {
 	AlarmRule(slave *Slave, data []byte, fcode uint8, info *Device)
 	Trigger(slave *Slave, data []byte, info *Device)
-	Action(guid, status string, level int, data float64, slaveId byte, groupId int, slaveName string, unit string, propertyName string)
 	execute(slave *Slave, status string, level int, data float64, info *Device)
 }
 
-type Alarm struct {
-	Triggers   []*Trigger  `json:"trigger"`    //条件
-	ShakeLimit *ShakeLimit `json:"shakeLimit"` //防抖动配置
+type Rule struct {
+	Triggers []*Trigger `json:"trigger"` //条件
 }
 
-func (engine *Alarm) execute(slave *Slave, status string, level int, data float64, info *Device) {
+func (engine *Rule) execute(slave *Slave, status string, level int, data float64, info *Device) {
 	if status == consts.ALARM { //逻辑判断 1状态未告警2上次数据状态未正常||上次报警时间比大于等于当前时间5分钟以上
+		alarmMsg := &device.DeviceMsg{
+			Ts:           time.Now(),
+			DataType:     consts.ALARM,
+			Name:         info.Name,
+			Address:      info.Address,
+			Level:        level,
+			DeviceId:     info.GuId,
+			SlaveId:      int(slave.SlaveId),
+			Data:         data,
+			GroupId:      info.GroupId,
+			SlaveName:    slave.SlaveName,
+			Unit:         slave.PropertyUnit,
+			PropertyName: slave.PropertyName,
+		}
+		device.AlarmChan <- alarmMsg //app 页面使用需要实时显示告警详情
 		if status == consts.ALARM && (slave.Status == 0 || time.Now().Sub(slave.AlarmTime) >= 5*time.Minute) {
-			device.AlarmChan <- &device.DeviceMsg{
-				Ts:           time.Now(),
-				DataType:     consts.ALARM,
-				Name:         info.Name,
-				Address:      info.Address,
-				Level:        level,
-				DeviceId:     info.GuId,
-				SlaveId:      int(slave.SlaveId),
-				Data:         data,
-				GroupId:      info.GroupId,
-				SlaveName:    slave.SlaveName,
-				Unit:         slave.PropertyUnit,
-				PropertyName: slave.PropertyName,
-			}
-			slave.Status = 1 //数据状态改为报警
+			device.NotifyChan <- alarmMsg // 电话短信push 只是触发一次消息，防止频繁报警
+			slave.Status = 1              //数据状态改为报警
 			slave.AlarmTime = time.Now()
 			slave.SaveTime = time.Now()
 			device.DataChan <- &device.DeviceMsg{
@@ -274,7 +295,7 @@ func (engine *Alarm) execute(slave *Slave, status string, level int, data float6
 	}
 
 }
-func (engine *Alarm) AlarmRule(slave *Slave, data []byte, fcode uint8, info *Device) {
+func (engine *Rule) AlarmRule(slave *Slave, data []byte, fcode uint8, info *Device) {
 	value := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
 	if info.IsType() {
 		if value >= 10000 {
@@ -354,7 +375,7 @@ func floating(point int, data []byte) (val string) {
 	}
 	return
 }
-func (engine *Alarm) Trigger(slave *Slave, data []byte, info *Device) {
+func (engine *Rule) Trigger(slave *Slave, data []byte, info *Device) {
 
 	if slave.Precision > 0 {
 		str := floating(slave.Precision, data)

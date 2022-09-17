@@ -10,7 +10,7 @@ import (
 	"giot/utils/consts"
 	"giot/utils/json"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"golang.org/x/text/message"
 	"gorm.io/gorm"
 	"runtime"
@@ -39,8 +39,13 @@ func Setup(mqtt mqtt.Client, tdengine *sql.DB, mysql *gorm.DB, redis *redis.Clie
 		alarmChan: make(chan *device.DeviceMsg, 1024),
 		queue:     queue.NewWithOption(queue.DefaultOption()),
 	}
+	t.clearAllOnline()
 	t.consume(t.queue, 4, t.td)
 	t.listenMqtt()
+
+}
+func (t *Transfer) clearAllOnline() {
+	t.li.ClearAll()
 }
 
 func (t *Transfer) listenMqtt() {

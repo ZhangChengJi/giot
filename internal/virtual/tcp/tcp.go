@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"fmt"
 	"giot/internal/model"
 	"giot/internal/virtual/protocol"
 	"giot/pkg/log"
@@ -10,12 +9,15 @@ import (
 	"sync"
 )
 
+var (
+	ListenMsgChan chan *model.ListenMsg
+)
+
 type TcpServer struct {
 	*gnet.EventServer
 	connectedSockets sync.Map
 	RegisterChan     chan *model.RegisterData
 	DataChan         chan *model.RemoteData
-	ListenMsgChan    chan *model.ListenMsg
 }
 
 func (ps *TcpServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {
@@ -33,7 +35,7 @@ func (ps *TcpServer) OnClosed(c gnet.Conn, err error) (action gnet.Action) {
 		RemoteAddr: c.RemoteAddr().String(),
 		Command:    1,
 	}
-	ps.ListenMsgChan <- ha
+	ListenMsgChan <- ha
 	return
 }
 func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
@@ -50,7 +52,6 @@ func (ps *TcpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.A
 				RemoteAddr: c.RemoteAddr().String(),
 				Conn:       c,
 			}
-			fmt.Println(da)
 			ps.DataChan <- da
 		}
 	}

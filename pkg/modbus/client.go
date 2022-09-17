@@ -62,6 +62,7 @@ func (c *client) ReadIndustryCode(data []byte) (result *ProtocolDataUnit, err er
 func (c *client) ReadIndustryF1Code(data []byte) (result []*ProtocolDataUnit, err error) {
 	return c.rtuHandler.F1Decode(data)
 }
+
 func (c *client) ReadHomeCode(data []byte) (pdu *ProtocolDataUnit, err error) {
 	return c.rtuHandler.HomeDecode(data)
 }
@@ -206,36 +207,6 @@ func (mb *RtuHandler) F1Decode(adu []byte) (result []*ProtocolDataUnit, err erro
 		result = append(result, protocolDataUnit)
 		s++
 	}
-
-	//for _, val := range length {
-	//	protocolDataStr := &ProtocolDataUnit{}
-	//	protocolDataStr.SlaveId = s           //从机id
-	//	protocolDataStr.FunctionCode = adu[1] //功能码
-	//	//protocolDataStr.DataType = val
-	//	protocolDataStr.Data = data[i : i+2]
-	//	if val > 0 { //精度大于0
-	//		//protocolDataStr.DataType = 1
-	//		//str := strconv.Itoa(int(bytesToUint16(BIG_ENDIAN, data[i:i+2])))
-	//		//spot := len(str) - val
-	//		//if len(str) > val {
-	//		//	for i, v := range str {
-	//		//		if i < spot {
-	//		//			protocolDataStr.Data = strings.Join([]string{protocolDataStr.Data, string(v)}, "")
-	//		//		} else if i == spot {
-	//		//			protocolDataStr.Data = strings.Join([]string{protocolDataStr.Data, string(v)}, ".")
-	//		//		} else {
-	//		//			protocolDataStr.Data = strings.Join([]string{protocolDataStr.Data, string(v)}, "")
-	//		//		}
-	//		//	}
-	//		//}
-	//
-	//	} else {
-	//		//protocolDataStr.DataType = 0
-	//		protocolDataStr.Data = data[i : i+2]
-	//		//protocolDataStr.Data = strconv.Itoa(int(bytesToUint16(BIG_ENDIAN, data[i:i+2])))
-	//	}
-
-	//}
 	return
 }
 
