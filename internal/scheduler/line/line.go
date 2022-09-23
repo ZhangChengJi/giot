@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	on  = 1
+	on  = "1"
 	off = 0
 )
 

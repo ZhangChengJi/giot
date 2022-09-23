@@ -5,15 +5,16 @@ import (
 	"errors"
 	"giot/conf"
 	"giot/internal/model"
+	"giot/pkg/etcd"
 	"giot/pkg/log"
 	"giot/pkg/modbus"
+	"giot/utils/consts"
 	"giot/utils/json"
-	"github.com/go-redis/redis/v8"
 	"gorm.io/gorm"
+	"strings"
 	"time"
 
 	gorm1 "giot/pkg/gorm"
-	redis1 "giot/pkg/redis"
 )
 
 const (
@@ -46,7 +47,7 @@ const (
 type Data struct {
 	modbuls modbus.Client
 	db      *gorm.DB
-	re      *redis.Client
+	et      etcd.Interface
 }
 
 func New() *Data {
@@ -55,16 +56,12 @@ func New() *Data {
 		log.Sugar.Errorf("mysql 加载配置错误%s", err)
 		return nil
 	}
-	redi, err := redis1.New(conf.RedisConfig)
-	if err != nil {
-		log.Sugar.Errorf("redis 加载配置错误%s", err)
-		return nil
-	}
-	log.Sugar.Info("redis mysql 加载完成...")
+
+	log.Sugar.Info("etcd mysql 加载完成...")
 	return &Data{
 		modbuls: modbus.NewClient(&modbus.RtuHandler{}),
 		db:      mysql,
-		re:      redi,
+		et:      etcd.GenEtcdStorage(),
 	}
 }
 func (d *Data) GetTimerData(deviceId string) (active *model.TimerActive, err error) {
@@ -120,10 +117,12 @@ func (d *Data) GetData(deviceId string) (devic *model.Device, err error) {
 
 }
 func (d *Data) GetDevice(deviceId string) (devic *model.Device, err error) {
-	k, err := d.re.Get(context.TODO(), DEVICE_INFO+":"+deviceId).Bytes()
+	key := strings.Join([]string{consts.METADATA, consts.DEVICE, deviceId}, consts.DIVIDER)
+
+	k, err := d.et.Get(context.TODO(), key)
 
 	if len(k) > 0 {
-		err = json.Unmarshal(k, &devic)
+		err = json.Unmarshal([]byte(k), &devic)
 		if err != nil {
 			log.Sugar.Errorf("转换错误%v错误", deviceId)
 			return nil, err
@@ -136,6 +135,7 @@ func (d *Data) GetDevice(deviceId string) (devic *model.Device, err error) {
 			log.Sugar.Errorf("缓存失败")
 			return nil, err
 		}
+
 		devic = &model.Device{
 			GuId:        device.Id,
 			Name:        device.DeviceName,
@@ -150,7 +150,7 @@ func (d *Data) GetDevice(deviceId string) (devic *model.Device, err error) {
 		if err != nil {
 			return nil, err
 		}
-		err = d.re.Set(context.TODO(), DEVICE_INFO+":"+device.Id, dejson, 0).Err()
+		err = d.et.Create(context.TODO(), key, string(dejson))
 		return devic, err
 	}
 }
@@ -172,10 +172,11 @@ func (d *Data) getActive(deviceId string, instruct bool, slaves []*model.Slave) 
 	return active, err
 }
 func (d *Data) getSalve(guid string) (slaves []*model.Slave, err error) {
-	result, err := d.re.Get(context.TODO(), SLAVE_INFO+":"+guid).Bytes()
+	key := strings.Join([]string{consts.METADATA, consts.SLAVE, guid}, consts.DIVIDER)
+	result, err := d.et.Get(context.TODO(), key)
 
 	if len(result) > 0 {
-		err = json.Unmarshal(result, &slaves)
+		err = json.Unmarshal([]byte(result), &slaves)
 		if err != nil {
 			return nil, err
 		}
@@ -185,7 +186,7 @@ func (d *Data) getSalve(guid string) (slaves []*model.Slave, err error) {
 	err = d.db.Model(&model.PigDeviceSlave{}).Select(
 		"pig_device_slave.slave_name,"+
 			"pig_device_slave.modbus_address,"+
-			"p.property_identification,"+
+			"p.property_precision,"+
 			"p.property_unit,"+
 			"p.property_name,"+
 			"p.property_register,"+
@@ -227,7 +228,7 @@ func (d *Data) getSalve(guid string) (slaves []*model.Slave, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = d.re.Set(context.TODO(), SLAVE_INFO+":"+guid, sljson, 0).Err()
+	err = d.et.Create(context.TODO(), key, string(sljson))
 	if err != nil {
 		log.Sugar.Errorf("缓存失败")
 		return nil, err
@@ -238,7 +239,7 @@ func (d *Data) getSalve(guid string) (slaves []*model.Slave, err error) {
 // createActive  创建动态指令
 func (d *Data) createActive(ta *model.TimerActive, code, salveId int, propertyRegister int) error {
 	tc := &tCode{}
-	err := tc.crateTimerCode(TIMER30_SECOND, ta).functionCode(code, d.modbuls, byte(salveId), uint16(propertyRegister))
+	err := tc.crateTimerCode(TIMER20_SECOND, ta).functionCode(code, d.modbuls, byte(salveId), uint16(propertyRegister))
 	if err != nil {
 		return err
 	}
@@ -247,7 +248,7 @@ func (d *Data) createActive(ta *model.TimerActive, code, salveId int, propertyRe
 }
 func (d *Data) createF1Active(ta *model.TimerActive, code, salveSize int) error {
 	tc := &tCode{}
-	err := tc.crateTimerCode(TIMER30_SECOND, ta).functionCode(code, d.modbuls, byte(241), uint16(salveSize))
+	err := tc.crateTimerCode(TIMER20_SECOND, ta).functionCode(code, d.modbuls, byte(241), uint16(salveSize))
 	if err != nil {
 		return err
 	}

@@ -47,7 +47,7 @@ type PigDevice struct {
 	LineStatus       int    `gorm:"line_status" json:"lineStatus"`             // 设备状态: 0:离线 1:在线
 	DeviceAddress    string `gorm:"device_address" json:"deviceAddress"`       // 设备地址
 	DeviceCoordinate string `gorm:"device_coordinate" json:"deviceCoordinate"` // 设备坐标信息
-	GroupId          int    `gorm:"group_id" json:"groupId"`                   //分组id
+	GroupId          int32  `gorm:"group_id" json:"groupId"`                   //分组id
 
 }
 
@@ -150,7 +150,7 @@ type Device struct {
 	BindStatus   int      `json:"bindStatus"`
 	Instruct     int      `json:"instruct"`
 	LineStatus   int      `json:"lineStatus"`
-	GroupId      int      `json:"groupId"`
+	GroupId      int32    `json:"groupId"`
 	FCode        *Ft      `json:"fCode"`
 	Salve        []*Slave `json:"salve"`
 	Address      string   `json:"address"`
@@ -232,7 +232,7 @@ type Interface interface {
 }
 
 type Rule struct {
-	Triggers []*Trigger `json:"trigger"` //条件
+	Triggers []*Trigger `json:"triggers"` //条件
 }
 
 func (engine *Rule) execute(slave *Slave, status string, level int, data float64, info *Device) {
@@ -258,13 +258,16 @@ func (engine *Rule) execute(slave *Slave, status string, level int, data float64
 			slave.AlarmTime = time.Now()
 			slave.SaveTime = time.Now()
 			device.DataChan <- &device.DeviceMsg{
-				Ts:       time.Now(),
-				DataType: consts.DATA,
-				Level:    level,
-				DeviceId: info.GuId,
-				SlaveId:  int(slave.SlaveId),
-				Data:     data,
-				GroupId:  info.GroupId,
+				Ts:           time.Now(),
+				DataType:     consts.DATA,
+				Level:        level,
+				DeviceId:     info.GuId,
+				SlaveId:      int(slave.SlaveId),
+				Data:         data,
+				GroupId:      info.GroupId,
+				SlaveName:    slave.SlaveName,
+				Unit:         slave.PropertyUnit,
+				PropertyName: slave.PropertyName,
 			}
 		}
 	} else {
@@ -272,26 +275,29 @@ func (engine *Rule) execute(slave *Slave, status string, level int, data float64
 			slave.SaveTime = time.Now()
 			slave.Status = 0 //数据状态改为正常
 			device.DataChan <- &device.DeviceMsg{
-				Ts:       time.Now(),
-				DataType: consts.DATA,
-				Level:    level,
-				DeviceId: info.GuId,
-				SlaveId:  int(slave.SlaveId),
-				Data:     data,
-				GroupId:  info.GroupId,
+				Ts:           time.Now(),
+				DataType:     consts.DATA,
+				Level:        level,
+				DeviceId:     info.GuId,
+				SlaveId:      int(slave.SlaveId),
+				Data:         data,
+				GroupId:      info.GroupId,
+				SlaveName:    slave.SlaveName,
+				Unit:         slave.PropertyUnit,
+				PropertyName: slave.PropertyName,
 			}
 		}
-		//实时数据
-		device.LastChan <- &device.DeviceMsg{
-			Ts:       time.Now(),
-			DataType: consts.DATA,
-			Level:    level,
-			DeviceId: info.GuId,
-			SlaveId:  int(slave.SlaveId),
-			Data:     data,
-			GroupId:  info.GroupId,
-		}
 
+	}
+	//实时数据
+	device.LastChan <- &device.DeviceMsg{
+		Ts:       time.Now(),
+		DataType: consts.DATA,
+		Level:    level,
+		DeviceId: info.GuId,
+		SlaveId:  int(slave.SlaveId),
+		Data:     data,
+		GroupId:  info.GroupId,
 	}
 
 }

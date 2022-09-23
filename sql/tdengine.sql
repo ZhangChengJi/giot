@@ -11,7 +11,7 @@
 -- ablocks: 每张表平均的内存块数
 -- precision：时间戳为微秒的标志位，ms表示毫秒，us表示微秒
 -- 数据保存90天  10天存一个文件块 内存块数 4个 允许修改
-CREATE DATABASE dory_device KEEP 90 DAYS 10 BLOCKS 4 UPDATE 1;
+CREATE DATABASE dory_device KEEP 30 DAYS 5 BLOCKS 4 UPDATE 1;
 SHOW VARIABLES;
 
 USE dory_device;
@@ -21,7 +21,7 @@ USE dory_device;
 -- 创建正常上数超级表    字段：时间戳、数据、状态。 标签：产品ID、设备ID、属性ID、从机ID、
 CREATE STABLE if not exists dory_device.device_data  (ts timestamp,gas float, status bool) TAGS(product_id binary(30), device_id binary(30),slave int,model_id binary(30));
 
-CREATE STABLE if not exists dory_device.device_data  (ts timestamp,data float,level int) TAGS( device_id binary(30),slave_id int,group_id bigint);
+CREATE STABLE if not exists dory_device.device_data  (ts timestamp,data float,level int,slave_name binary(30), property_name binary(30),unit binary(10)) TAGS( device_id binary(30),slave_id int,group_id bigint);
 
 
 --根据超级表创建子表
@@ -34,7 +34,7 @@ INSERT INTO dory_device.device_data_01 USING dory_device.device_data  TAGS("123"
 --创建告警表  字段：时间戳、数据、告警级别  标签 产品ID、设备ID、属性ID、从机ID、告警ID
 CREATE STABLE if not exists dory_device.device_alarm  (ts timestamp,gas float, alarm_level int) TAGS(product_id binary(30), device_id binary(30),slave int,model_id binary(30),alarm_id binary(30));
 
-CREATE STABLE if not exists dory_device.device_alarm  (ts timestamp,data float, level int) TAGS( device_id binary(30),slave_id int,group_id bigint);
+CREATE STABLE if not exists dory_device.device_alarm  (ts timestamp,data float, level int,slave_name binary(30), property_name binary(30),unit binary(10)) TAGS( device_id binary(30),slave_id int,group_id bigint);
 
 
 --创建通知表 字段：时间戳、告警级别、通知方式、电话号码

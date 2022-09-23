@@ -14,10 +14,12 @@ import (
 	"giot/pkg/log"
 	"giot/pkg/modbus"
 	"giot/utils/consts"
+	"giot/utils/runtime"
 	"github.com/RussellLuo/timingwheel"
 	mqtt1 "github.com/eclipse/paho.mqtt.golang"
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
 	log4j "log"
+	"strings"
 	"time"
 )
 
@@ -177,72 +179,90 @@ func (p *Processor) DeleteTask(remoteAddr string) {
 
 }
 func (p *Processor) watchDeviceChange() {
-	if token := p.mq.Subscribe("device/change", 0, func(client mqtt1.Client, message mqtt1.Message) {
-		var changeData model.DeviceChange
-		err := json.Unmarshal(message.Payload(), &changeData)
-		if err != nil {
-			log.Sugar.Errorf("topic：'device/change' deviceData failed:%s", err)
-			return
-		}
-		remoteAddr, err := p.cache.Guid.Get(context.TODO(), changeData.DeviceId)
-		if err == nil && remoteAddr != "" { //没有就不管
-			if changeData.Action == "update" { //更新
-				p.activeStore(changeData)
-			} else if changeData.Action == "deleteAll" { //删除
-				p.DeleteTask(remoteAddr)
-			} else if changeData.Action == "bind" { //绑定/解绑
-				p.activeStore(changeData)
+	c, cancel := context.WithCancel(context.TODO())
+	key := strings.Join([]string{consts.METADATA}, consts.DIVIDER)
+
+	ch := p.Stg.Watch(c, key)
+	p.workerPool.Submit(func() {
+		defer runtime.HandlePanic()
+		defer cancel()
+		for event := range ch {
+			if event.Canceled {
+				log.Sugar.Warnf("watch failed: %s", event.Error)
+			}
+			for i := range event.Events {
+				switch event.Events[i].Type {
+				case etcd.EventTypePut:
+					log.Sugar.Infof("etcd device data key:%v ,update...", event.Events[i].Key)
+					fmt.Println(event.Events[i].Value)
+					//key := event.Events[i].Key[len("transfer/"+guid):]
+					//giot/device/296424434E48313836FFD805/code
+					ret := strings.Split(event.Events[i].Key, "/")
+					p.activeStore(ret[2], ret[3], event.Events[i].Value)
+
+					//key := event.Events[i].Key[len(s.opt.BasePath)+1:]
+					//objPtr, err := s.StringToObjPtr(event.Events[i].Value, key)
+					//if err != nil {
+					//	logs.Warnf("value convert to obj failed: %s", err)
+					//	continue
+					//}
+					//s.cache.Store(key, objPtr)
+				case etcd.EventTypeDelete:
+					ret := strings.Split(event.Events[i].Key, "/")
+					remoteAddr, err := p.cache.Guid.Get(context.TODO(), ret[2])
+					if err != nil {
+						return
+					}
+					log.Sugar.Infof("etcd device data key:%v ,delete...", event.Events[i].Key)
+
+					p.DeleteTask(remoteAddr)
+				}
 			}
 		}
-	}); token.Wait() && token.Error() != nil {
-		fmt.Println(token.Error())
-		log.Sugar.Errorf("subscribe topic:%s failed", "device/change")
-	}
+	})
 }
 
-func (p *Processor) activeStore(changeData model.DeviceChange) {
-	guid := changeData.DeviceId
+func (p *Processor) activeStore(action, guid, val string) {
 	remoteAddr, err := p.cache.Guid.Get(context.TODO(), guid)
 	if err != nil {
-		log.Sugar.Warnf("not found guid:%s Unable to query remoteAddr", guid)
 		return
 	}
-	if changeData.Action == "bind" {
-		devi, err := p.data.GetDevice(changeData.DeviceId)
+	if action == "device" {
+		var devcie *model.Device
+		err := json.Unmarshal([]byte(val), &devcie)
 		if err != nil {
 			return
 		}
-		p.cache.Device.Update(context.TODO(), remoteAddr, devi)
-	} else if changeData.Action == "update" {
-		slaveData, err := p.data.GetSlaveData(changeData.DeviceId)
-		if err != nil {
-			return
-		}
-		p.cache.Slave.Update(context.TODO(), remoteAddr, slaveData)
-		log.Sugar.Infof("更新了slave%v", changeData.DeviceId)
+		p.cache.Device.Update(context.TODO(), remoteAddr, devcie)
 
-		timer, err := p.data.GetTimerData(changeData.DeviceId)
-		if err != nil {
-			return
+	} else if action == "slave" {
+
+		var slaveData []*model.Slave
+		json.Unmarshal([]byte(val), &slaveData)
+		p.cache.Slave.Update(context.TODO(), remoteAddr, slaveData)
+		log.Sugar.Infof("更新了slave%v", guid)
+	}
+	timer, err := p.data.GetTimerData(guid)
+	if err != nil {
+		return
+	}
+	timers, err := p.cache.Timer.Get(context.TODO(), remoteAddr)
+	if err != nil {
+		log.Sugar.Errorf("Unable to get remoteAddr:%s gnet.conn", remoteAddr)
+		return
+	}
+	timers.T.Stop()
+	if timer != nil {
+		task := &wheelTimer.SyncTimer{
+			Guid:       guid,
+			Conn:       timers.Conn,
+			RemoteAddr: remoteAddr,
+			Time:       timer.Ft.Tm,
+			Directives: timer.Ft.FCode,
 		}
-		timers, err := p.cache.Timer.Get(context.TODO(), remoteAddr)
-		if err != nil {
-			log.Sugar.Errorf("Unable to get remoteAddr:%s gnet.conn", remoteAddr)
-			return
-		}
-		timers.T.Stop()
-		if timer != nil {
-			task := &wheelTimer.SyncTimer{
-				Guid:       changeData.DeviceId,
-				Conn:       timers.Conn,
-				RemoteAddr: remoteAddr,
-				Time:       timer.Ft.Tm,
-				Directives: timer.Ft.FCode,
-			}
-			task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time, Rew: changeData.DeviceId}, task.Execute)
-			p.cache.Timer.Update(context.TODO(), remoteAddr, task)
-			log.Sugar.Infof("更新了timer%v", changeData.DeviceId)
-		}
+		task.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: task.Time, Rew: guid}, task.Execute)
+		p.cache.Timer.Update(context.TODO(), remoteAddr, task)
+		log.Sugar.Infof("更新了timer%v", guid)
 	}
 
 }

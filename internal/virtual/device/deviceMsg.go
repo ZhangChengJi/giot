@@ -15,7 +15,7 @@ type DeviceMsg struct {
 	DataType     string    `json:"dataType"`
 	Level        int       `json:"level"`
 	DeviceId     string    `json:"deviceId"`
-	GroupId      int       `json:"groupId"`
+	GroupId      int32     `json:"groupId"`
 	Status       string    `json:"status"`
 	Name         string    `json:"name" `
 	SlaveId      int       `json:"slaveId"`
@@ -66,9 +66,9 @@ func (r DeviceMsg) TaosTags() []interface{} {
 func (r DeviceMsg) TaosTable() string {
 	switch r.DataType {
 	case consts.DATA:
-		return strings.Join([]string{"device_data", r.DeviceId, strconv.Itoa(r.SlaveId), strconv.Itoa(r.GroupId)}, "_")
+		return strings.Join([]string{"device_data", r.DeviceId, strconv.Itoa(r.SlaveId), string(r.GroupId)}, "_")
 	case consts.ALARM:
-		return strings.Join([]string{"device_alarm", r.DeviceId, strconv.Itoa(r.SlaveId), strconv.Itoa(r.GroupId)}, "_")
+		return strings.Join([]string{"device_alarm", r.DeviceId, strconv.Itoa(r.SlaveId), string(r.GroupId)}, "_")
 	default:
 		return ""
 
@@ -86,9 +86,9 @@ func (r DeviceMsg) TaosValues() []interface{} {
 	var values []interface{}
 	values = append(values, r.Ts)
 	if r.DataType == consts.DATA {
-		values = append(values, r.Data, r.Level)
+		values = append(values, r.Data, r.Level, r.SlaveName, r.PropertyName, r.Unit)
 	} else {
-		values = append(values, r.Data, r.Level)
+		values = append(values, r.Data, r.Level, r.SlaveName, r.PropertyName, r.Unit)
 	}
 
 	return values
