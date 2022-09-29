@@ -328,9 +328,9 @@ func (p *Processor) register(data *model.RegisterData) {
 		line := &store.LineTimer{
 			Guid:   val.GuId,
 			Status: 1,
-			Time:   60 * time.Second,
+			Time:   80 * time.Second,
 		}
-		line.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: 60 * time.Second}, line.Execute)
+		line.T = p.Timer.ScheduleFunc(&wheelTimer.DeviceScheduler{Interval: 80 * time.Second}, line.Execute)
 		//先存储一下guid和远程地址对应关系
 		p.cache.Guid.Create(context.TODO(), guid, remoteAddr)
 		deviceInfo := &model.Device{

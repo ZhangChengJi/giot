@@ -12,7 +12,6 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/go-redis/redis/v8"
 	"golang.org/x/text/message"
-	"gorm.io/gorm"
 	"runtime"
 	"strconv"
 	"time"
@@ -23,18 +22,16 @@ var qOption *queue.Option = queue.DefaultOption().SetMaxQueueSize(10000).SetMaxB
 type Transfer struct {
 	mq        mqtt.Client
 	td        *sql.DB
-	db        *gorm.DB
 	dataChan  chan []byte
 	alarmChan chan *device.DeviceMsg
 	queue     *queue.Queue
 	li        line.LineCache
 }
 
-func Setup(mqtt mqtt.Client, tdengine *sql.DB, mysql *gorm.DB, redis *redis.Client) {
+func Setup(mqtt mqtt.Client, tdengine *sql.DB, redis *redis.Client) {
 	var t = &Transfer{
 		mq:        mqtt,
 		td:        tdengine,
-		db:        mysql,
 		li:        &line.Line{Re: redis},
 		alarmChan: make(chan *device.DeviceMsg, 1024),
 		queue:     queue.NewWithOption(queue.DefaultOption()),
@@ -50,7 +47,7 @@ func (t *Transfer) clearAllOnline() {
 
 func (t *Transfer) listenMqtt() {
 	t.mq.Subscribe("device/data/#", 0, t.dataHandler)
-	t.mq.Subscribe("device/alarm/#", 0, t.alarmHandler)
+	t.mq.Subscribe("device/alarmSave/#", 0, t.alarmHandler)
 	t.mq.Subscribe("device/line/#", 0, t.lineHandler)
 }
 func (t *Transfer) dataHandler(client mqtt.Client, msg mqtt.Message) {

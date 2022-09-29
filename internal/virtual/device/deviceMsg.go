@@ -21,7 +21,7 @@ type DeviceMsg struct {
 	SlaveId      int       `json:"slaveId"`
 	SlaveName    string    `json:"slaveName"`
 	Address      string    `json:"address"`
-	Data         float64   `json:"data"`
+	Data         string    `json:"data"`
 	Unit         string    `json:"unit"`
 	PropertyName string    `json:"propertyName"`
 }
@@ -66,9 +66,9 @@ func (r DeviceMsg) TaosTags() []interface{} {
 func (r DeviceMsg) TaosTable() string {
 	switch r.DataType {
 	case consts.DATA:
-		return strings.Join([]string{"device_data", r.DeviceId, strconv.Itoa(r.SlaveId), string(r.GroupId)}, "_")
+		return strings.Join([]string{"device_data", r.DeviceId, strconv.Itoa(r.SlaveId), strconv.Itoa(int(r.GroupId))}, "_")
 	case consts.ALARM:
-		return strings.Join([]string{"device_alarm", r.DeviceId, strconv.Itoa(r.SlaveId), string(r.GroupId)}, "_")
+		return strings.Join([]string{"device_alarm", r.DeviceId, strconv.Itoa(r.SlaveId), strconv.Itoa(int(r.GroupId))}, "_")
 	default:
 		return ""
 

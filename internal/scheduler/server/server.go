@@ -6,7 +6,6 @@ import (
 	"giot/conf"
 	"giot/internal/scheduler/transfer"
 	"giot/pkg/etcd"
-	"giot/pkg/gorm"
 	"giot/pkg/log"
 	"giot/pkg/mqtt"
 	"giot/pkg/redis"
@@ -35,14 +34,8 @@ func NewServer() *server {
 
 func (s *server) init() error {
 
-	log.Sugar.Info("Initialize mysql...")
-	db, err := gorm.New(conf.MysqlConfig)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
 	log.Sugar.Info("Initialize etcd...")
-	err = etcd.InitETCDClient(conf.ETCDConfig)
+	err := etcd.InitETCDClient(conf.ETCDConfig)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -69,7 +62,7 @@ func (s *server) init() error {
 		return err
 	}
 
-	go transfer.Setup(mq, td, db, re)
+	go transfer.Setup(mq, td, re)
 
 	return nil
 }

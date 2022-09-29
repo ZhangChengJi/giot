@@ -274,7 +274,7 @@ func initEtcdConfig(conf Etcd) {
 		endpoints = conf.Endpoints
 	}
 
-	prefix := "/apisix"
+	prefix := "giot"
 	if len(conf.Prefix) > 0 {
 		prefix = conf.Prefix
 	}

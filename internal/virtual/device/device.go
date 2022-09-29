@@ -13,12 +13,13 @@ import (
 )
 
 var (
-	DataChan   chan *DeviceMsg
-	LastChan   chan *DeviceMsg
-	AlarmChan  chan *DeviceMsg
-	NotifyChan chan *DeviceMsg
-	OnlineChan chan *DeviceMsg
-	DebugChan  chan *Debug
+	DataChan      chan *DeviceMsg
+	LastChan      chan *DeviceMsg
+	AlarmChan     chan *DeviceMsg
+	AlarmSaveChan chan *DeviceMsg
+	NotifyChan    chan *DeviceMsg
+	OnlineChan    chan *DeviceMsg
+	DebugChan     chan *Debug
 )
 
 type Debug struct {
@@ -40,9 +41,10 @@ type Interface interface {
 func Init() {
 	DataChan = make(chan *DeviceMsg, 1024)
 	AlarmChan = make(chan *DeviceMsg, 1024)
+	AlarmSaveChan = make(chan *DeviceMsg, 1024)
 	NotifyChan = make(chan *DeviceMsg, 1024)
 	OnlineChan = make(chan *DeviceMsg, 1024)
-	LastChan = make(chan *DeviceMsg, 1024)
+	LastChan = make(chan *DeviceMsg, 10240)
 	DebugChan = make(chan *Debug)
 	d := &device{mqtt: mqtt.Broker{Client: mqtt.Client}, modbus: modbus.NewClient(&modbus.RtuHandler{})}
 
@@ -62,6 +64,8 @@ func (d *device) listenLoop() {
 			d.Insert(data)
 		case data := <-AlarmChan: //告警实时数据
 			d.InsertAlarm(data)
+		case data := <-AlarmSaveChan: //告警实时数据
+			d.InsertAlarmSave(data)
 		case data := <-OnlineChan: //上下线数据
 			d.Line(data)
 		case data := <-NotifyChan: //通知数据
@@ -90,12 +94,19 @@ func (d *device) InsertLast(data *DeviceMsg) {
 
 }
 func (d *device) InsertNotify(data *DeviceMsg) {
-	topic := append([]byte("device/notify/"), data.DeviceId...)
-	payload, _ := json.Marshal(data)
-	d.mqtt.Publish(string(topic), payload)
+	if data.GroupId > 0 {
+		topic := append([]byte("device/notify/"), data.DeviceId...)
+		payload, _ := json.Marshal(data)
+		d.mqtt.Publish(string(topic), payload)
+	}
 }
 func (d *device) InsertAlarm(data *DeviceMsg) {
 	topic := append([]byte("device/alarm/"), data.DeviceId...)
+	payload, _ := json.Marshal(data)
+	d.mqtt.Publish(string(topic), payload)
+}
+func (d *device) InsertAlarmSave(data *DeviceMsg) {
+	topic := append([]byte("device/alarmSave/"), data.DeviceId...)
 	payload, _ := json.Marshal(data)
 	d.mqtt.Publish(string(topic), payload)
 }

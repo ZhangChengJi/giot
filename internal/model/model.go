@@ -235,9 +235,9 @@ type Rule struct {
 	Triggers []*Trigger `json:"triggers"` //条件
 }
 
-func (engine *Rule) execute(slave *Slave, status string, level int, data float64, info *Device) {
+func (engine *Rule) execute(slave *Slave, status string, level int, data string, info *Device) {
 	if status == consts.ALARM { //逻辑判断 1状态未告警2上次数据状态未正常||上次报警时间比大于等于当前时间5分钟以上
-		alarmMsg := &device.DeviceMsg{
+		alarmMsg := &device.DeviceMsg{ // app报警/pc页面报警展示
 			Ts:           time.Now(),
 			DataType:     consts.ALARM,
 			Name:         info.Name,
@@ -251,7 +251,12 @@ func (engine *Rule) execute(slave *Slave, status string, level int, data float64
 			Unit:         slave.PropertyUnit,
 			PropertyName: slave.PropertyName,
 		}
-		device.AlarmChan <- alarmMsg //app 页面使用需要实时显示告警详情
+		device.AlarmChan <- alarmMsg                                                   //app 页面使用需要实时显示告警详情
+		if status == consts.ALARM && time.Now().Sub(slave.SaveTime) >= 1*time.Minute { //报警数据1分钟保存一次
+			device.AlarmSaveChan <- alarmMsg
+			slave.SaveTime = time.Now()
+		}
+
 		if status == consts.ALARM && (slave.Status == 0 || time.Now().Sub(slave.AlarmTime) >= 5*time.Minute) {
 			device.NotifyChan <- alarmMsg // 电话短信push 只是触发一次消息，防止频繁报警
 			slave.Status = 1              //数据状态改为报警
@@ -270,8 +275,8 @@ func (engine *Rule) execute(slave *Slave, status string, level int, data float64
 				PropertyName: slave.PropertyName,
 			}
 		}
-	} else {
-		if slave.Status == 1 || time.Now().Sub(slave.SaveTime) >= 15*time.Minute { //如果上次上报数据未报警｜｜正常数据15分钟存储一次
+	} else { //正常保存数据
+		if slave.Status == 1 || time.Now().Sub(slave.SaveTime) >= 15*time.Minute { //如果上次上报数据报警｜｜正常数据15分钟存储一次
 			slave.SaveTime = time.Now()
 			slave.Status = 0 //数据状态改为正常
 			device.DataChan <- &device.DeviceMsg{
@@ -308,25 +313,25 @@ func (engine *Rule) AlarmRule(slave *Slave, data []byte, fcode uint8, info *Devi
 			switch value { //是否工业产品
 			// 10000     探测器内部错误
 			case consts.InternalError:
-				engine.execute(slave, consts.HITCH, consts.Internal, 0, info)
+				engine.execute(slave, consts.HITCH, consts.Internal, "0", info)
 				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.Internal, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
 				return
 
 			// 20000     通讯错误
 			case consts.CommunicationError:
-				engine.execute(slave, consts.HITCH, consts.Communication, 0, info)
+				engine.execute(slave, consts.HITCH, consts.Communication, "0", info)
 				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.Communication, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
 				return
 
 			// 30000     主机未连接探测器、主机屏蔽探测器
 			case consts.ShieldError:
-				engine.execute(slave, consts.HITCH, consts.Shield, 0, info)
+				engine.execute(slave, consts.HITCH, consts.Shield, "0", info)
 				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.Shield, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
 				return
 
 				// 65535     探头故障
 			case consts.SlaveHitchError:
-				engine.execute(slave, consts.HITCH, consts.SlaveHitch, 0, info)
+				engine.execute(slave, consts.HITCH, consts.SlaveHitch, "0", info)
 				//engine.Action(info.GuId, info.Name, info.Address, consts.ALARM, consts.SlaveHitch, 0, slave.SlaveId, info.GroupId, slave.SlaveName, slave.PropertyUnit, slave.PropertyName)
 				return
 			}
@@ -342,24 +347,26 @@ func (engine *Rule) AlarmRule(slave *Slave, data []byte, fcode uint8, info *Devi
 		case consts.HomeHitchError:
 			//故障（若为0，是传感器低故障报警，若为1，是传感器高故障报警，若为2，是传感器寿命报警）
 			if value == 0 { //若为0，是传感器低故障报警
-				engine.execute(slave, consts.HITCH, consts.LowHitch, 0, info)
+				engine.execute(slave, consts.HITCH, consts.LowHitch, "0", info)
 			} else if value == 1 { //若为1，是传感器高故障报警
-				engine.execute(slave, consts.HITCH, consts.HighHitch, 0, info)
+				engine.execute(slave, consts.HITCH, consts.HighHitch, "0", info)
 			} else if value == 2 { //若为2，是传感器寿命报警
-				engine.execute(slave, consts.HITCH, consts.Life, 0, info)
+				engine.execute(slave, consts.HITCH, consts.Life, "0", info)
 			}
 			return
 		case consts.HomeHighError:
 			data := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
 			in := decimal.NewFromInt32(int32(data))
 			value, _ := in.Float64()
-			engine.execute(slave, consts.ALARM, consts.High, value, info)
+			str := strconv.FormatFloat(value, 'f', -1, 32)
+			engine.execute(slave, consts.ALARM, consts.High, str, info)
 			return
 		case consts.HomeLowError:
 			data := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
 			in := decimal.NewFromInt32(int32(data))
 			value, _ := in.Float64()
-			engine.execute(slave, consts.ALARM, consts.High, value, info)
+			str := strconv.FormatFloat(value, 'f', -1, 32)
+			engine.execute(slave, consts.ALARM, consts.High, str, info)
 			return
 		}
 
@@ -386,9 +393,7 @@ func (engine *Rule) Trigger(slave *Slave, data []byte, info *Device) {
 	if slave.Precision > 0 {
 		str := floating(slave.Precision, data)
 		dec, err := decimal.NewFromString(str)
-
-		value, _ := dec.Float64()
-
+		value := dec.String()
 		if err != nil {
 			return
 		}
@@ -433,7 +438,7 @@ func (engine *Rule) Trigger(slave *Slave, data []byte, info *Device) {
 	} else {
 		data := encoding.BytesToUint16(encoding.BIG_ENDIAN, data)
 		in := decimal.NewFromInt32(int32(data))
-		value, _ := in.Float64()
+		value := in.String()
 		for _, trigger := range engine.Triggers { //循环告警触发条件
 			switch trigger.Operator { //TODO 判断比对条件(任意) 触发条件满足条件中任意一个即可触发  高报优先
 			case consts.EQ: //=

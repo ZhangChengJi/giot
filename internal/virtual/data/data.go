@@ -3,18 +3,14 @@ package data
 import (
 	"context"
 	"errors"
-	"giot/conf"
 	"giot/internal/model"
 	"giot/pkg/etcd"
 	"giot/pkg/log"
 	"giot/pkg/modbus"
 	"giot/utils/consts"
 	"giot/utils/json"
-	"gorm.io/gorm"
 	"strings"
 	"time"
-
-	gorm1 "giot/pkg/gorm"
 )
 
 const (
@@ -46,21 +42,13 @@ const (
 
 type Data struct {
 	modbuls modbus.Client
-	db      *gorm.DB
 	et      etcd.Interface
 }
 
 func New() *Data {
-	mysql, err := gorm1.New(conf.MysqlConfig)
-	if err != nil {
-		log.Sugar.Errorf("mysql 加载配置错误%s", err)
-		return nil
-	}
-
-	log.Sugar.Info("etcd mysql 加载完成...")
+	log.Sugar.Info("etcd 加载完成...")
 	return &Data{
 		modbuls: modbus.NewClient(&modbus.RtuHandler{}),
-		db:      mysql,
 		et:      etcd.GenEtcdStorage(),
 	}
 }
@@ -95,12 +83,21 @@ func (d *Data) GetSlaveData(deviceId string) (slaves []*model.Slave, err error) 
 func (d *Data) GetData(deviceId string) (devic *model.Device, err error) {
 
 	device, err := d.GetDevice(deviceId)
+	if err != nil {
+		return devic, err
+	}
 	slaves, err := d.getSalve(deviceId)
+	if err != nil {
+		return devic, err
+	}
 	var instruct bool
 	if device.Instruct == INSTRUCT_ONE {
 		instruct = true
 	}
 	active, err := d.getActive(deviceId, instruct, slaves)
+	if err != nil {
+		return devic, err
+	}
 	devic = &model.Device{
 		GuId:        device.GuId,
 		Name:        device.Name,
@@ -118,41 +115,16 @@ func (d *Data) GetData(deviceId string) (devic *model.Device, err error) {
 }
 func (d *Data) GetDevice(deviceId string) (devic *model.Device, err error) {
 	key := strings.Join([]string{consts.METADATA, consts.DEVICE, deviceId}, consts.DIVIDER)
-
 	k, err := d.et.Get(context.TODO(), key)
-
 	if len(k) > 0 {
 		err = json.Unmarshal([]byte(k), &devic)
 		if err != nil {
-			log.Sugar.Errorf("转换错误%v错误", deviceId)
+			log.Sugar.Warnf("转换错误%v错误", deviceId)
 			return nil, err
 		}
-		return devic, err
-	} else {
-		var device *model.PigDevice
-		err := d.db.Where(&model.PigDevice{Id: deviceId}).First(&device).Error
-		if err != nil {
-			log.Sugar.Errorf("缓存失败")
-			return nil, err
-		}
-
-		devic = &model.Device{
-			GuId:        device.Id,
-			Name:        device.DeviceName,
-			ProductType: 1,
-			Instruct:    device.InstructFlag,
-			BindStatus:  device.BindStatus,
-			LineStatus:  device.LineStatus,
-			GroupId:     device.GroupId,
-			Address:     device.DeviceAddress,
-		}
-		dejson, err := json.Marshal(devic)
-		if err != nil {
-			return nil, err
-		}
-		err = d.et.Create(context.TODO(), key, string(dejson))
 		return devic, err
 	}
+	return devic, err
 }
 func (d *Data) getActive(deviceId string, instruct bool, slaves []*model.Slave) (active *model.TimerActive, err error) {
 	active = &model.TimerActive{Guid: deviceId}
@@ -181,57 +153,6 @@ func (d *Data) getSalve(guid string) (slaves []*model.Slave, err error) {
 			return nil, err
 		}
 		return slaves, nil
-	}
-	var deviceSlaves []*model.PigDeviceSlave
-	err = d.db.Model(&model.PigDeviceSlave{}).Select(
-		"pig_device_slave.slave_name,"+
-			"pig_device_slave.modbus_address,"+
-			"p.property_precision,"+
-			"p.property_unit,"+
-			"p.property_name,"+
-			"p.property_register,"+
-			"p.address_offset,"+
-			"r.alarm_rule ").Joins("LEFT JOIN pig_property p ON p.id=pig_device_slave.property_id "+
-		"LEFT JOIN pig_device_rule r ON r.property_id =p.id").Where(
-		"pig_device_slave.device_id=? AND r.device_id =? ", guid, guid).Scan(&deviceSlaves).Error
-	if err != nil {
-		log.Sugar.Errorf("load slave property rule no found.", err)
-		return nil, err
-	}
-
-	for _, s := range deviceSlaves {
-
-		slave := &model.Slave{
-			SlaveId:          byte(s.ModbusAddress),
-			SlaveName:        s.SlaveName,
-			Precision:        s.PropertyPrecision,
-			PropertyUnit:     s.PropertyUnit,
-			PropertyName:     s.PropertyName,
-			PropertyRegister: s.PropertyRegister,
-			AddressOffset:    s.AddressOffset,
-		}
-		//告警条件
-		var trigger []*model.Trigger
-
-		err = json.Unmarshal([]byte(s.AlarmRule), &trigger)
-		if err != nil {
-			return nil, err
-		}
-
-		slave.Rule = &model.Rule{
-			Triggers: trigger,
-		}
-
-		slaves = append(slaves, slave)
-	}
-	sljson, err := json.Marshal(slaves)
-	if err != nil {
-		return nil, err
-	}
-	err = d.et.Create(context.TODO(), key, string(sljson))
-	if err != nil {
-		log.Sugar.Errorf("缓存失败")
-		return nil, err
 	}
 	return slaves, nil
 }
@@ -265,7 +186,6 @@ func (tc *tCode) crateTimerCode(duration time.Duration, ta *model.TimerActive) *
 	if ta.Ft == nil {
 		ta.Ft = &model.Ft{Tm: duration}
 	}
-
 	if ta.Ft.Tm == duration {
 		tc.Ft = ta.Ft
 	}
